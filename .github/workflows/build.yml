@@ -21,6 +21,9 @@ jobs:
       - name: Compile server
         run: python -m py_compile server/main.py
 
+      - name: Run server tests
+        run: python -m unittest discover -s tests
+
   ios:
     name: iOS IPA build
     runs-on: macos-latest

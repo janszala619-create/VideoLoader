@@ -1,15 +1,23 @@
 """VideoLoader-Server: liefert Videoinfos und Downloads über yt-dlp."""
 
+import logging
 import os
+import re
 import shutil
 import tempfile
+import traceback
+import uuid
+from urllib.parse import urlsplit, urlunsplit
 
 import yt_dlp
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import JSONResponse
 from fastapi.responses import FileResponse
 from starlette.background import BackgroundTask
+from yt_dlp.version import __version__ as YT_DLP_VERSION
 
 app = FastAPI(title="VideoLoader Server")
+logger = logging.getLogger("videoloader")
 
 
 @app.get("/")
@@ -17,8 +25,59 @@ def root():
     return {"status": "ok", "hinweis": "VideoLoader-Server läuft. Diese Adresse in der App eintragen."}
 
 
+def _safe_url(url: str, max_length: int = 160) -> str:
+    parts = urlsplit(url)
+    safe = urlunsplit((parts.scheme, parts.netloc, parts.path, "", ""))
+    if len(safe) > max_length:
+        return safe[: max_length - 3] + "..."
+    return safe
+
+
+def _sanitize_log_text(text: str) -> str:
+    redacted = re.sub(r"viewkey=[A-Za-z0-9_-]+", "viewkey=<redacted>", text)
+    return re.sub(r"https?://[^\s)]+", lambda match: _safe_url(match.group(0)), redacted)
+
+
+class YtdlpLogger:
+    def debug(self, message):
+        logger.debug("yt_dlp %s", _sanitize_log_text(str(message)))
+
+    def warning(self, message):
+        logger.warning("yt_dlp %s", _sanitize_log_text(str(message)))
+
+    def error(self, message):
+        logger.error("yt_dlp %s", _sanitize_log_text(str(message)))
+
+
+def _http_headers(url: str) -> dict[str, str]:
+    parts = urlsplit(url)
+    origin = urlunsplit((parts.scheme, parts.netloc, "/", "", "")) if parts.scheme and parts.netloc else ""
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) "
+            "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 "
+            "Mobile/15E148 Safari/604.1"
+        ),
+        "Accept-Language": "en-US,en;q=0.9",
+    }
+    if origin:
+        headers["Referer"] = origin
+    return headers
+
+
+def _base_ydl_options(url: str) -> dict:
+    return {
+        "quiet": True,
+        "no_warnings": True,
+        "noplaylist": True,
+        "http_headers": _http_headers(url),
+        "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
+        "logger": YtdlpLogger(),
+    }
+
+
 def _extract_info(url: str) -> dict:
-    opts = {"quiet": True, "no_warnings": True, "noplaylist": True}
+    opts = _base_ydl_options(url)
     with yt_dlp.YoutubeDL(opts) as ydl:
         info = ydl.extract_info(url, download=False)
     if info.get("_type") == "playlist":
@@ -72,77 +131,93 @@ def api_info(url: str = Query(..., description="Link zum Video")):
     }
 
 
-def _format_attempts(height: int | None, format_id: str | None) -> list[str]:
-    h = f"[height<={height}]" if height else ""
-    direct = "[protocol!*=m3u8][protocol!*=dash]"
-    attempts = [
-        f"best{h}[vcodec^=avc1][acodec^=mp4a][ext=mp4]{direct}",
-        f"best{h}[ext=mp4]{direct}",
-        f"best{h}{direct}",
-        f"bestvideo{h}[vcodec^=avc1]+bestaudio[acodec^=mp4a]",
-        f"bestvideo{h}+bestaudio/best{h}/best",
-    ]
-
-    requested = (format_id or "").strip()
-    if requested and requested != "best":
-        attempts.insert(0, requested)
-    return list(dict.fromkeys(attempts))
+def _format_selector(quality: int | None) -> str:
+    h = f"[height<={quality}]" if quality else ""
+    return f"bestvideo{h}+bestaudio/best{h}"
 
 
-def _download_options(tmpdir: str, format_selector: str) -> dict:
-    return {
-        "quiet": True,
-        "no_warnings": True,
-        "noplaylist": True,
+def _download_options(url: str, tmpdir: str, format_selector: str) -> dict:
+    opts = _base_ydl_options(url)
+    opts.update({
         "format": format_selector,
         "outtmpl": os.path.join(tmpdir, "video.%(ext)s"),
         "merge_output_format": "mp4",
-        "postprocessors": [{"key": "FFmpegVideoRemuxer", "preferedformat": "mp4"}],
         "retries": 5,
         "fragment_retries": 5,
         "extractor_retries": 3,
         "file_access_retries": 3,
         "socket_timeout": 30,
-    }
+    })
+    return opts
 
 
-def _clear_download_files(tmpdir: str) -> None:
-    for name in os.listdir(tmpdir):
-        path = os.path.join(tmpdir, name)
-        if os.path.isfile(path):
-            os.remove(path)
+def _download_error_response(request_id: str):
+    return JSONResponse(
+        status_code=422,
+        content={
+            "error": {
+                "code": "DOWNLOAD_FAILED",
+                "message": "Video download failed",
+                "phase": "download",
+                "request_id": request_id,
+            }
+        },
+    )
 
 
 @app.get("/api/download")
 def api_download(
     url: str = Query(..., description="Link zum Video"),
     height: int | None = Query(None, description="Maximale Auflösung, z. B. 1080"),
-    format_id: str | None = Query(None, description="Optionaler yt-dlp-Formatwähler"),
+    quality: int | None = Query(None, description="Maximale Auflösung, z. B. 1080"),
 ):
+    request_id = uuid.uuid4().hex[:12]
+    requested_quality = quality if quality is not None else height
+    format_selector = _format_selector(requested_quality)
     tmpdir = tempfile.mkdtemp(prefix="videoloader_")
-    info = None
-    last_error = None
     try:
-        for format_selector in _format_attempts(height, format_id):
-            _clear_download_files(tmpdir)
-            opts = _download_options(tmpdir, format_selector)
-            try:
-                with yt_dlp.YoutubeDL(opts) as ydl:
-                    info = ydl.extract_info(url, download=True)
-                break
-            except Exception as exc:
-                last_error = exc
-        else:
-            raise last_error or RuntimeError("Keine passende Videoqualität gefunden.")
+        logger.info(
+            "download_start request_id=%s url=%s quality=%s selector=%s yt_dlp=%s phase=download",
+            request_id,
+            _safe_url(url),
+            requested_quality,
+            format_selector,
+            YT_DLP_VERSION,
+        )
+        opts = _download_options(url, tmpdir, format_selector)
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(url, download=True)
     except Exception as exc:
         shutil.rmtree(tmpdir, ignore_errors=True)
-        raise HTTPException(status_code=422, detail=f"Download fehlgeschlagen: {exc}")
+        logger.error(
+            "download_failed request_id=%s url=%s quality=%s selector=%s yt_dlp=%s "
+            "extractor=%s phase=download exception_type=%s message=%s traceback=%s",
+            request_id,
+            _safe_url(url),
+            requested_quality,
+            format_selector,
+            YT_DLP_VERSION,
+            getattr(exc, "ie", None) or "unknown",
+            type(exc).__name__,
+            _sanitize_log_text(str(exc)),
+            _sanitize_log_text(traceback.format_exc()),
+        )
+        return _download_error_response(request_id)
 
     files = [os.path.join(tmpdir, f) for f in os.listdir(tmpdir)]
     files = [f for f in files if os.path.isfile(f)]
     if not files:
         shutil.rmtree(tmpdir, ignore_errors=True)
-        raise HTTPException(status_code=500, detail="Der Server konnte keine Videodatei erzeugen.")
+        logger.error(
+            "download_failed request_id=%s url=%s quality=%s selector=%s yt_dlp=%s "
+            "extractor=unknown phase=download exception_type=MissingOutput message=no_file_created",
+            request_id,
+            _safe_url(url),
+            requested_quality,
+            format_selector,
+            YT_DLP_VERSION,
+        )
+        return _download_error_response(request_id)
     path = max(files, key=os.path.getsize)
 
     title = (info.get("title") or "video")[:80]

@@ -124,32 +124,15 @@ struct ServerAPI {
         case .videoLoader:
             var query = [URLQueryItem(name: "url", value: videoURL)]
             if let height = quality?.height {
-                query.append(URLQueryItem(name: "height", value: String(height)))
+                query.append(URLQueryItem(name: "quality", value: String(height)))
             }
             return try url(path: "/api/download", query: query)
         case .vidSave:
-            // Keine starre Format-Nummer schicken: Bei manchen Plattformen ändern sich
-            // die Kennungen zwischen Prüfen und Download ("Requested format is not available").
-            // Stattdessen eine Auswahl-Regel, die yt-dlp auf dem Server auflöst.
-            // Zwei Dinge sind fürs iPhone entscheidend: der Video-Codec H.264 (avc1)
-            // und eine direkt ladbare Datei. HLS-/DASH-Streams (m3u8, Häppchen) kann
-            // der Cloud-Server ohne ffmpeg nicht sauber zu MP4 umpacken – die Datei
-            // wäre dann unabspielbar. Deshalb: erst H.264 als direkte Datei, dann
-            // andere direkte Dateien, Streams nur als allerletzte Ausweichstufe.
-            let direct = "[protocol!*=m3u8][protocol!*=dash]"
-            let selector: String
+            var query = [URLQueryItem(name: "url", value: videoURL)]
             if let height = quality?.height {
-                let h = "[height<=\(height)]"
-                selector = "b\(h)[vcodec^=avc1]\(direct)/b\(h)[ext=mp4]\(direct)/b\(h)\(direct)/b\(h)[vcodec^=avc1]/bv*\(h)[vcodec^=avc1]+ba[acodec^=mp4a]/b\(h)/bv*\(h)+ba/b"
-            } else if let formatId = quality?.formatId, formatId != "best" {
-                selector = "b[vcodec^=avc1]\(direct)/b[ext=mp4]\(direct)/b\(direct)/\(formatId)/best"
-            } else {
-                selector = "b[vcodec^=avc1]\(direct)/b[ext=mp4]\(direct)/b\(direct)/bv*[vcodec^=avc1]+ba[acodec^=mp4a]/b"
+                query.append(URLQueryItem(name: "quality", value: String(height)))
             }
-            return try url(path: "/api/download", query: [
-                URLQueryItem(name: "url", value: videoURL),
-                URLQueryItem(name: "format_id", value: selector),
-            ])
+            return try url(path: "/api/download", query: query)
         }
     }
 
@@ -190,9 +173,12 @@ struct ServerAPI {
         guard let http = response as? HTTPURLResponse,
               !(200...299).contains(http.statusCode) else { return }
         if let data,
-           let payload = try? JSONDecoder().decode([String: String].self, from: data),
-           let detail = payload["detail"] {
-            throw APIError.server(detail)
+           let payload = try? JSONDecoder().decode(ServerErrorDTO.self, from: data) {
+            throw APIError.server(payload.userMessage)
+        }
+        if let data,
+           let payload = try? JSONDecoder().decode(LegacyErrorDTO.self, from: data) {
+            throw APIError.server(payload.detail)
         }
         throw APIError.server("Der Server hat einen Fehler gemeldet (Code \(http.statusCode)).")
     }
@@ -225,4 +211,36 @@ private struct VidSaveInfoDTO: Decodable {
     let thumbnail: String?
     let duration: Double?
     let formats: [Format]
+}
+
+private struct ServerErrorDTO: Decodable {
+    struct ErrorBody: Decodable {
+        let code: String
+        let message: String
+        let phase: String?
+        let requestId: String?
+
+        enum CodingKeys: String, CodingKey {
+            case code, message, phase
+            case requestId = "request_id"
+        }
+    }
+
+    let error: ErrorBody
+
+    var userMessage: String {
+        switch error.code {
+        case "DOWNLOAD_FAILED":
+            if let requestId = error.requestId {
+                return "Download fehlgeschlagen. Bitte versuche es erneut. Fehler-ID: \(requestId)"
+            }
+            return "Download fehlgeschlagen. Bitte versuche es erneut."
+        default:
+            return error.message
+        }
+    }
+}
+
+private struct LegacyErrorDTO: Decodable {
+    let detail: String
 }
