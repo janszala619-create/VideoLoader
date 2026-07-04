@@ -118,7 +118,7 @@ class DownloadFlowTests(unittest.TestCase):
         response = main.api_download("https://invalid.example.test/watch/1", quality=720)
         payload = json.loads(response.body)
 
-        self.assertEqual(response.status_code, 422)
+        self.assertEqual(response.status_code, 502)
         self.assertEqual(payload["error"]["code"], "DOWNLOAD_FAILED")
         self.assertEqual(payload["error"]["message"], "Video download failed")
         self.assertEqual(payload["error"]["phase"], "download")
@@ -127,7 +127,7 @@ class DownloadFlowTests(unittest.TestCase):
         response = main.api_download("https://gone.example.test/watch/1", quality=1080)
         payload = json.loads(response.body)
 
-        self.assertEqual(response.status_code, 422)
+        self.assertEqual(response.status_code, 502)
         self.assertEqual(payload["error"]["code"], "DOWNLOAD_FAILED")
         self.assertIn("request_id", payload["error"])
 

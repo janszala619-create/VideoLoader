@@ -153,7 +153,7 @@ def _download_options(url: str, tmpdir: str, format_selector: str) -> dict:
 
 def _download_error_response(request_id: str):
     return JSONResponse(
-        status_code=422,
+        status_code=502,
         content={
             "error": {
                 "code": "DOWNLOAD_FAILED",

@@ -128,11 +128,20 @@ struct ServerAPI {
             }
             return try url(path: "/api/download", query: query)
         case .vidSave:
-            var query = [URLQueryItem(name: "url", value: videoURL)]
+            let direct = "[protocol!*=m3u8][protocol!*=dash]"
+            let selector: String
             if let height = quality?.height {
-                query.append(URLQueryItem(name: "quality", value: String(height)))
+                let h = "[height<=\(height)]"
+                selector = "bv*\(h)+ba/b\(h)[vcodec^=avc1]\(direct)/b\(h)[ext=mp4]\(direct)/b\(h)/b"
+            } else if let formatId = quality?.formatId, formatId != "best" {
+                selector = "bv*+ba/b[vcodec^=avc1]\(direct)/b[ext=mp4]\(direct)/b/\(formatId)/best"
+            } else {
+                selector = "bv*+ba/b[vcodec^=avc1]\(direct)/b[ext=mp4]\(direct)/b"
             }
-            return try url(path: "/api/download", query: query)
+            return try url(path: "/api/download", query: [
+                URLQueryItem(name: "url", value: videoURL),
+                URLQueryItem(name: "format_id", value: selector),
+            ])
         }
     }
 
@@ -179,6 +188,10 @@ struct ServerAPI {
         if let data,
            let payload = try? JSONDecoder().decode(LegacyErrorDTO.self, from: data) {
             throw APIError.server(payload.detail)
+        }
+        if let http = response as? HTTPURLResponse,
+           http.statusCode == 422 {
+            throw APIError.server("Der Server konnte die Download-Anfrage nicht verarbeiten. Bitte pruefe Server-Typ und Server-Adresse in den Einstellungen.")
         }
         throw APIError.server("Der Server hat einen Fehler gemeldet (Code \(http.statusCode)).")
     }
