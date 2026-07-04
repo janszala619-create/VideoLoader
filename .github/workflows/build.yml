@@ -22,18 +22,33 @@ jobs:
         run: python -m py_compile server/main.py
 
   ios:
-    name: iOS simulator build
+    name: iOS IPA build
     runs-on: macos-latest
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Build app
+      - name: Build app for iPhone
         run: |
           xcodebuild \
             -project ios/VideoLoader.xcodeproj \
             -scheme VideoLoader \
-            -destination 'generic/platform=iOS Simulator' \
+            -configuration Release \
+            -sdk iphoneos \
             CODE_SIGNING_ALLOWED=NO \
+            CONFIGURATION_BUILD_DIR="$PWD/build/Release-iphoneos" \
             build
+
+      - name: Package unsigned IPA
+        run: |
+          mkdir -p build/ipa/Payload
+          cp -R build/Release-iphoneos/VideoLoader.app build/ipa/Payload/
+          cd build/ipa
+          zip -qry ../VideoLoader-unsigned.ipa Payload
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VideoLoader-unsigned-ipa
+          path: build/VideoLoader-unsigned.ipa
