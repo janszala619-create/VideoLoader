@@ -131,18 +131,20 @@ struct ServerAPI {
             // Keine starre Format-Nummer schicken: Bei manchen Plattformen ändern sich
             // die Kennungen zwischen Prüfen und Download ("Requested format is not available").
             // Stattdessen eine Auswahl-Regel, die yt-dlp auf dem Server auflöst.
-            // Entscheidend für das iPhone ist der Video-Codec H.264 (avc1) – ein MP4
-            // mit VP9/AV1 darin spielt nicht ab. Deshalb: erst alle H.264-Varianten
-            // (fertig kombiniert oder zusammenzufügen), dann erst "irgendein MP4",
-            // andere Container nur als allerletzte Ausweichstufe.
+            // Zwei Dinge sind fürs iPhone entscheidend: der Video-Codec H.264 (avc1)
+            // und eine direkt ladbare Datei. HLS-/DASH-Streams (m3u8, Häppchen) kann
+            // der Cloud-Server ohne ffmpeg nicht sauber zu MP4 umpacken – die Datei
+            // wäre dann unabspielbar. Deshalb: erst H.264 als direkte Datei, dann
+            // andere direkte Dateien, Streams nur als allerletzte Ausweichstufe.
+            let direct = "[protocol!*=m3u8][protocol!*=dash]"
             let selector: String
             if let height = quality?.height {
                 let h = "[height<=\(height)]"
-                selector = "b\(h)[vcodec^=avc1]/bv*\(h)[vcodec^=avc1]+ba[acodec^=mp4a]/bv*\(h)[vcodec^=avc1]+ba/b\(h)[ext=mp4]/b\(h)/bv*\(h)+ba/b"
+                selector = "b\(h)[vcodec^=avc1]\(direct)/b\(h)[ext=mp4]\(direct)/b\(h)\(direct)/b\(h)[vcodec^=avc1]/bv*\(h)[vcodec^=avc1]+ba[acodec^=mp4a]/b\(h)/bv*\(h)+ba/b"
             } else if let formatId = quality?.formatId, formatId != "best" {
-                selector = "\(formatId)/b[vcodec^=avc1]/b[ext=mp4]/best"
+                selector = "\(formatId)/b[vcodec^=avc1]\(direct)/b[ext=mp4]\(direct)/b\(direct)/best"
             } else {
-                selector = "b[vcodec^=avc1]/bv*[vcodec^=avc1]+ba[acodec^=mp4a]/bv*[vcodec^=avc1]+ba/b[ext=mp4]/b"
+                selector = "b[vcodec^=avc1]\(direct)/b[ext=mp4]\(direct)/b\(direct)/bv*[vcodec^=avc1]+ba[acodec^=mp4a]/b"
             }
             return try url(path: "/api/download", query: [
                 URLQueryItem(name: "url", value: videoURL),
