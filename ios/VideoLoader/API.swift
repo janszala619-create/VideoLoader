@@ -131,16 +131,18 @@ struct ServerAPI {
             // Keine starre Format-Nummer schicken: Bei manchen Plattformen ändern sich
             // die Kennungen zwischen Prüfen und Download ("Requested format is not available").
             // Stattdessen eine Auswahl-Regel, die yt-dlp auf dem Server auflöst.
-            // MP4 mit H.264/AAC bevorzugen, damit das Video sicher auf dem iPhone
-            // abspielbar ist – andere Container (WebM, AVI …) nur als letzte Ausweichstufe.
+            // Entscheidend für das iPhone ist der Video-Codec H.264 (avc1) – ein MP4
+            // mit VP9/AV1 darin spielt nicht ab. Deshalb: erst alle H.264-Varianten
+            // (fertig kombiniert oder zusammenzufügen), dann erst "irgendein MP4",
+            // andere Container nur als allerletzte Ausweichstufe.
             let selector: String
             if let height = quality?.height {
                 let h = "[height<=\(height)]"
-                selector = "b\(h)[ext=mp4][vcodec^=avc1]/b\(h)[ext=mp4]/bv*\(h)[vcodec^=avc1]+ba[acodec^=mp4a]/b\(h)/bv*\(h)+ba/b"
+                selector = "b\(h)[vcodec^=avc1]/bv*\(h)[vcodec^=avc1]+ba[acodec^=mp4a]/bv*\(h)[vcodec^=avc1]+ba/b\(h)[ext=mp4]/b\(h)/bv*\(h)+ba/b"
             } else if let formatId = quality?.formatId, formatId != "best" {
-                selector = "\(formatId)/b[ext=mp4]/best"
+                selector = "\(formatId)/b[vcodec^=avc1]/b[ext=mp4]/best"
             } else {
-                selector = "b[ext=mp4][vcodec^=avc1]/b[ext=mp4]/bv*[vcodec^=avc1]+ba[acodec^=mp4a]/b"
+                selector = "b[vcodec^=avc1]/bv*[vcodec^=avc1]+ba[acodec^=mp4a]/bv*[vcodec^=avc1]+ba/b[ext=mp4]/b"
             }
             return try url(path: "/api/download", query: [
                 URLQueryItem(name: "url", value: videoURL),
