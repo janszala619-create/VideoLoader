@@ -107,7 +107,10 @@ extension DownloadManager: URLSessionDownloadDelegate {
             return
         }
         // Video dauerhaft in der App-Bibliothek ablegen ("Meine Videos")
-        let target = DownloadLibrary.makeDestination(title: pendingTitle)
+        let target = DownloadLibrary.makeDestination(
+            title: pendingTitle,
+            fileExtension: Self.fileExtension(for: downloadTask.response)
+        )
         do {
             try FileManager.default.moveItem(at: location, to: target)
         } catch {
@@ -122,6 +125,17 @@ extension DownloadManager: URLSessionDownloadDelegate {
         let nsError = error as NSError
         guard nsError.code != NSURLErrorCancelled else { return }
         update(.failed("Download fehlgeschlagen: \(error.localizedDescription)"))
+    }
+
+    /// Leitet die passende Dateiendung aus dem vom Server gemeldeten Typ ab.
+    private static func fileExtension(for response: URLResponse?) -> String {
+        switch response?.mimeType?.lowercased() {
+        case "video/quicktime": return "mov"
+        case "video/webm": return "webm"
+        case "video/x-matroska": return "mkv"
+        case "video/x-msvideo", "video/avi": return "avi"
+        default: return "mp4"
+        }
     }
 
     private static func serverMessage(from body: String, code: Int) -> String {

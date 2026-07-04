@@ -131,13 +131,16 @@ struct ServerAPI {
             // Keine starre Format-Nummer schicken: Bei manchen Plattformen ändern sich
             // die Kennungen zwischen Prüfen und Download ("Requested format is not available").
             // Stattdessen eine Auswahl-Regel, die yt-dlp auf dem Server auflöst.
+            // MP4 mit H.264/AAC bevorzugen, damit das Video sicher auf dem iPhone
+            // abspielbar ist – andere Container (WebM, AVI …) nur als letzte Ausweichstufe.
             let selector: String
             if let height = quality?.height {
-                selector = "b[height<=\(height)]/bv*[height<=\(height)]+ba/b"
+                let h = "[height<=\(height)]"
+                selector = "b\(h)[ext=mp4][vcodec^=avc1]/b\(h)[ext=mp4]/bv*\(h)[vcodec^=avc1]+ba[acodec^=mp4a]/b\(h)/bv*\(h)+ba/b"
             } else if let formatId = quality?.formatId, formatId != "best" {
-                selector = "\(formatId)/best"
+                selector = "\(formatId)/b[ext=mp4]/best"
             } else {
-                selector = "best"
+                selector = "b[ext=mp4][vcodec^=avc1]/b[ext=mp4]/bv*[vcodec^=avc1]+ba[acodec^=mp4a]/b"
             }
             return try url(path: "/api/download", query: [
                 URLQueryItem(name: "url", value: videoURL),

@@ -61,8 +61,9 @@ enum DownloadLibrary {
             at: directory,
             includingPropertiesForKeys: [.contentModificationDateKey, .fileSizeKey]
         )) ?? []
+        let videoExtensions: Set<String> = ["mp4", "mov", "m4v", "webm", "mkv", "avi"]
         return urls
-            .filter { $0.pathExtension.lowercased() == "mp4" }
+            .filter { videoExtensions.contains($0.pathExtension.lowercased()) }
             .map { url in
                 let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey])
                 return DownloadedVideo(
@@ -76,7 +77,7 @@ enum DownloadLibrary {
     }
 
     /// Baut aus dem Videotitel einen sicheren, noch freien Dateinamen.
-    static func makeDestination(title: String) -> URL {
+    static func makeDestination(title: String, fileExtension: String = "mp4") -> URL {
         var safe = String(title.map { char in
             char.isLetter || char.isNumber || char == " " || char == "-" || char == "_" ? char : " "
         })
@@ -84,10 +85,10 @@ enum DownloadLibrary {
         if safe.count > 60 { safe = String(safe.prefix(60)).trimmingCharacters(in: .whitespaces) }
         if safe.isEmpty { safe = "Video" }
 
-        var url = directory.appendingPathComponent(safe).appendingPathExtension("mp4")
+        var url = directory.appendingPathComponent(safe).appendingPathExtension(fileExtension)
         var counter = 2
         while FileManager.default.fileExists(atPath: url.path) {
-            url = directory.appendingPathComponent("\(safe) \(counter)").appendingPathExtension("mp4")
+            url = directory.appendingPathComponent("\(safe) \(counter)").appendingPathExtension(fileExtension)
             counter += 1
         }
         return url
