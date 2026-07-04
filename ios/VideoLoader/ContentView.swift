@@ -225,15 +225,8 @@ struct ContentView: View {
                     }
                 }
                 cancelButton
-            case .saving:
-                HStack {
-                    ProgressView()
-                    Text("Wird in der Fotos-Galerie gespeichert …")
-                        .foregroundStyle(.secondary)
-                        .padding(.leading, 8)
-                }
             case .done:
-                Label("Fertig! Das Video ist jetzt in deiner Fotos-Galerie.", systemImage: "checkmark.circle.fill")
+                Label("Fertig! Das Video liegt jetzt im Tab „Meine Videos“ – dort kannst du es ansehen, teilen oder in die Fotos-Galerie sichern.", systemImage: "checkmark.circle.fill")
                     .foregroundStyle(.green)
                 Button("Neues Video laden") {
                     videoLink = ""
@@ -252,7 +245,7 @@ struct ContentView: View {
         Button {
             startDownload()
         } label: {
-            Label("Herunterladen & in Fotos speichern", systemImage: "arrow.down.circle.fill")
+            Label("Herunterladen", systemImage: "arrow.down.circle.fill")
                 .fontWeight(.semibold)
         }
     }
@@ -306,7 +299,11 @@ struct ContentView: View {
             let api = ServerAPI(kind: activeServer, baseURL: activeBaseURL)
             let url = try api.downloadURL(for: cleanedLink, quality: selectedQuality)
             let fallback = try? api.downloadURL(for: cleanedLink, quality: nil)
-            downloader.start(url: url, fallbackURL: fallback == url ? nil : fallback)
+            downloader.start(
+                url: url,
+                fallbackURL: fallback == url ? nil : fallback,
+                title: info?.title ?? "Video"
+            )
         } catch let error as APIError {
             errorMessage = error.errorDescription
         } catch {

@@ -6,7 +6,6 @@ final class DownloadManager: NSObject, ObservableObject {
         case idle
         case waitingForServer          // Server lädt das Video gerade von der Plattform
         case downloading(Double?)      // Fortschritt 0...1, nil = unbekannt
-        case saving                    // Video wird in die Fotos-Galerie übertragen
         case done
         case failed(String)
     }
@@ -23,11 +22,13 @@ final class DownloadManager: NSObject, ObservableObject {
     private var task: URLSessionDownloadTask?
     private var fallbackURL: URL?
     private var fallbackUsed = false
+    private var pendingTitle = "Video"
 
-    func start(url: URL, fallbackURL: URL? = nil) {
+    func start(url: URL, fallbackURL: URL? = nil, title: String = "Video") {
         task?.cancel()
         self.fallbackURL = fallbackURL
         fallbackUsed = false
+        pendingTitle = title
         phase = .waitingForServer
         task = session.downloadTask(with: url)
         task?.resume()
@@ -65,22 +66,21 @@ final class DownloadManager: NSObject, ObservableObject {
         update(.failed(message))
     }
 
-    private func saveToPhotos(fileURL: URL) {
-        update(.saving)
+    /// Sichert ein bereits in der App gespeichertes Video zusätzlich in die Fotos-Galerie.
+    /// Ruft die Rückmeldung mit nil (Erfolg) oder einer Fehlermeldung auf.
+    static func saveToPhotos(fileURL: URL, completion: @escaping (String?) -> Void) {
         PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
             guard status == .authorized || status == .limited else {
-                try? FileManager.default.removeItem(at: fileURL)
-                self.update(.failed("Kein Zugriff auf Fotos. Bitte in den iPhone-Einstellungen unter Datenschutz & Sicherheit → Fotos → VideoLoader das Hinzufügen erlauben."))
+                DispatchQueue.main.async {
+                    completion("Kein Zugriff auf Fotos. Bitte in den iPhone-Einstellungen unter Datenschutz & Sicherheit → Fotos → VideoLoader das Hinzufügen erlauben.")
+                }
                 return
             }
             PHPhotoLibrary.shared().performChanges({
                 PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: fileURL)
             }) { success, error in
-                try? FileManager.default.removeItem(at: fileURL)
-                if success {
-                    self.update(.done)
-                } else {
-                    self.update(.failed("Speichern in Fotos fehlgeschlagen: \(error?.localizedDescription ?? "Unbekannter Fehler")"))
+                DispatchQueue.main.async {
+                    completion(success ? nil : "Speichern in Fotos fehlgeschlagen: \(error?.localizedDescription ?? "Unbekannter Fehler")")
                 }
             }
         }
@@ -106,17 +106,15 @@ extension DownloadManager: URLSessionDownloadDelegate {
             fail(Self.serverMessage(from: body, code: http.statusCode))
             return
         }
-        // Datei muss die Endung .mp4 haben, sonst lehnt die Fotos-Galerie sie ab
-        let target = FileManager.default.temporaryDirectory
-            .appendingPathComponent(UUID().uuidString)
-            .appendingPathExtension("mp4")
+        // Video dauerhaft in der App-Bibliothek ablegen ("Meine Videos")
+        let target = DownloadLibrary.makeDestination(title: pendingTitle)
         do {
             try FileManager.default.moveItem(at: location, to: target)
         } catch {
-            update(.failed("Die Videodatei konnte nicht zwischengespeichert werden: \(error.localizedDescription)"))
+            update(.failed("Die Videodatei konnte nicht gespeichert werden: \(error.localizedDescription)"))
             return
         }
-        saveToPhotos(fileURL: target)
+        update(.done)
     }
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {

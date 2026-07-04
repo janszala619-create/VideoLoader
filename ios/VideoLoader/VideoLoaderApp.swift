@@ -4,7 +4,16 @@ import SwiftUI
 struct VideoLoaderApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            TabView {
+                ContentView()
+                    .tabItem {
+                        Label("Laden", systemImage: "arrow.down.circle")
+                    }
+                LibraryView()
+                    .tabItem {
+                        Label("Meine Videos", systemImage: "film.stack")
+                    }
+            }
         }
     }
 }

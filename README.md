@@ -5,7 +5,7 @@ Die App besteht aus zwei Teilen:
 | Teil | Ordner | Aufgabe |
 |---|---|---|
 | Server | `server/` | Läuft auf deinem Mac. Holt die Videos mit yt-dlp von YouTube & über 1.000 anderen Plattformen. |
-| iPhone-App | `ios/` | Link einfügen → Vorschau ansehen → Qualität wählen → Download → landet automatisch in der Fotos-Galerie. |
+| iPhone-App | `ios/` | Link einfügen → Vorschau ansehen → Qualität wählen → Download → Video landet im Tab „Meine Videos“ und kann von dort angesehen, geteilt oder in die Fotos-Galerie gesichert werden. |
 
 ### Zwei Server – oben in der App umschaltbar
 
@@ -61,8 +61,8 @@ Kopiere den kompletten Ordner `VideoLoader` auf deinen Mac (z. B. per USB-Stick,
 
 1. Beim ersten Start öffnen sich die **Einstellungen**: Trage dort die Server-Adresse aus Schritt 2 ein (z. B. `http://192.168.1.23:8000`). iPhone und Mac müssen im **selben WLAN** sein.
 2. Video-Link kopieren (z. B. über „Teilen → Kopieren“ in der YouTube-App), in der App einfügen und **„Video prüfen“** tippen.
-3. Vorschau ansehen (▶ auf dem Vorschaubild), **Qualität wählen** und **„Herunterladen & in Fotos speichern“** tippen.
-4. Beim ersten Download fragt iOS nach der Erlaubnis, Videos zu **Fotos** hinzuzufügen – erlauben. Fertig: Das Video liegt in deiner Galerie.
+3. Vorschau ansehen (▶ auf dem Vorschaubild), **Qualität wählen** und **„Herunterladen“** tippen.
+4. Das Video erscheint im Tab **„Meine Videos“**: Antippen zum Abspielen, Teilen-Symbol zum Weitergeben, Foto-Symbol zum Sichern in die **Fotos-Galerie** (beim ersten Mal fragt iOS nach Erlaubnis – erlauben). Wischen nach links löscht ein Video.
 
 ---
 
