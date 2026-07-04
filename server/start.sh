@@ -6,8 +6,10 @@ if [ ! -d ".venv" ]; then
   echo "Richte Python-Umgebung ein (nur beim ersten Mal) ..."
   python3 -m venv .venv
   ./.venv/bin/pip install --upgrade pip
-  ./.venv/bin/pip install -r requirements.txt
 fi
+
+# Abhängigkeiten aktualisieren – wichtig, wenn requirements.txt neue yt-dlp-Hilfspakete bekommt
+./.venv/bin/pip install --upgrade --quiet -r requirements.txt
 
 # yt-dlp aktuell halten – wichtig, damit YouTube & Co. funktionieren
 ./.venv/bin/pip install --upgrade --quiet yt-dlp
