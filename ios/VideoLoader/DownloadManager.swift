@@ -21,9 +21,13 @@ final class DownloadManager: NSObject, ObservableObject {
         return URLSession(configuration: config, delegate: self, delegateQueue: nil)
     }()
     private var task: URLSessionDownloadTask?
+    private var fallbackURL: URL?
+    private var fallbackUsed = false
 
-    func start(url: URL) {
+    func start(url: URL, fallbackURL: URL? = nil) {
         task?.cancel()
+        self.fallbackURL = fallbackURL
+        fallbackUsed = false
         phase = .waitingForServer
         task = session.downloadTask(with: url)
         task?.resume()
@@ -43,6 +47,22 @@ final class DownloadManager: NSObject, ObservableObject {
 
     private func update(_ newPhase: Phase) {
         DispatchQueue.main.async { self.phase = newPhase }
+    }
+
+    /// Meldet einen Fehler – bei "Format nicht verfügbar" wird vorher automatisch
+    /// ein zweiter Versuch mit der besten verfügbaren Qualität gestartet.
+    private func fail(_ message: String) {
+        if message.contains("Requested format is not available"),
+           let fallbackURL, !fallbackUsed {
+            fallbackUsed = true
+            update(.waitingForServer)
+            DispatchQueue.main.async {
+                self.task = self.session.downloadTask(with: fallbackURL)
+                self.task?.resume()
+            }
+            return
+        }
+        update(.failed(message))
     }
 
     private func saveToPhotos(fileURL: URL) {
@@ -83,7 +103,7 @@ extension DownloadManager: URLSessionDownloadDelegate {
         if let http = downloadTask.response as? HTTPURLResponse,
            !(200...299).contains(http.statusCode) {
             let body = (try? String(contentsOf: location, encoding: .utf8)) ?? ""
-            update(.failed(Self.serverMessage(from: body, code: http.statusCode)))
+            fail(Self.serverMessage(from: body, code: http.statusCode))
             return
         }
         // Datei muss die Endung .mp4 haben, sonst lehnt die Fotos-Galerie sie ab

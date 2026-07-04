@@ -305,7 +305,8 @@ struct ContentView: View {
         do {
             let api = ServerAPI(kind: activeServer, baseURL: activeBaseURL)
             let url = try api.downloadURL(for: cleanedLink, quality: selectedQuality)
-            downloader.start(url: url)
+            let fallback = try? api.downloadURL(for: cleanedLink, quality: nil)
+            downloader.start(url: url, fallbackURL: fallback == url ? nil : fallback)
         } catch let error as APIError {
             errorMessage = error.errorDescription
         } catch {

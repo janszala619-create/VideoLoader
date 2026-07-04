@@ -104,7 +104,7 @@ struct ServerAPI {
         // "best" zuerst als bequeme Standardwahl, dann die konkreten Formate
         var qualities = [QualityOption(id: "best", label: "Automatisch (beste Qualität)", height: nil, formatId: "best")]
         qualities += dto.formats.map { f in
-            QualityOption(id: f.formatId, label: Self.vidSaveLabel(f), height: nil, formatId: f.formatId)
+            QualityOption(id: f.formatId, label: Self.vidSaveLabel(f), height: Self.parseHeight(f.quality), formatId: f.formatId)
         }
 
         return VideoInfo(
@@ -128,10 +128,20 @@ struct ServerAPI {
             }
             return try url(path: "/api/download", query: query)
         case .vidSave:
-            let formatId = quality?.formatId ?? "best"
+            // Keine starre Format-Nummer schicken: Bei manchen Plattformen ändern sich
+            // die Kennungen zwischen Prüfen und Download ("Requested format is not available").
+            // Stattdessen eine Auswahl-Regel, die yt-dlp auf dem Server auflöst.
+            let selector: String
+            if let height = quality?.height {
+                selector = "b[height<=\(height)]/bv*[height<=\(height)]+ba/b"
+            } else if let formatId = quality?.formatId, formatId != "best" {
+                selector = "\(formatId)/best"
+            } else {
+                selector = "best"
+            }
             return try url(path: "/api/download", query: [
                 URLQueryItem(name: "url", value: videoURL),
-                URLQueryItem(name: "format_id", value: formatId),
+                URLQueryItem(name: "format_id", value: selector),
             ])
         }
     }
@@ -144,6 +154,13 @@ struct ServerAPI {
         } catch {
             throw APIError.unreachable
         }
+    }
+
+    /// Liest die Pixelhöhe aus Angaben wie "480p" oder "1080p60".
+    private static func parseHeight(_ quality: String?) -> Int? {
+        guard let quality else { return nil }
+        let digits = quality.prefix { $0.isNumber }
+        return Int(digits)
     }
 
     private static func vidSaveLabel(_ f: VidSaveInfoDTO.Format) -> String {
