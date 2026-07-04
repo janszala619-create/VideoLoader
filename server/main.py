@@ -133,7 +133,7 @@ def api_info(url: str = Query(..., description="Link zum Video")):
 
 def _format_selector(quality: int | None) -> str:
     h = f"[height<={quality}]" if quality else ""
-    return f"bestvideo{h}+bestaudio/best{h}"
+    return f"best{h}[ext=mp4]/best{h}/bestvideo{h}+bestaudio/best"
 
 
 def _download_options(url: str, tmpdir: str, format_selector: str) -> dict:
@@ -144,6 +144,7 @@ def _download_options(url: str, tmpdir: str, format_selector: str) -> dict:
         "merge_output_format": "mp4",
         "retries": 5,
         "fragment_retries": 5,
+        "concurrent_fragment_downloads": 8,
         "extractor_retries": 3,
         "file_access_retries": 3,
         "socket_timeout": 30,

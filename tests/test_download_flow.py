@@ -82,20 +82,32 @@ class DownloadFlowTests(unittest.TestCase):
         response = main.api_download("https://example.test/watch/1", quality=720)
 
         self.assertEqual(response.media_type, "video/mp4")
-        self.assertEqual(FakeYoutubeDL.calls[0]["format"], "bestvideo[height<=720]+bestaudio/best[height<=720]")
+        self.assertEqual(
+            FakeYoutubeDL.calls[0]["format"],
+            "best[height<=720][ext=mp4]/best[height<=720]/bestvideo[height<=720]+bestaudio/best",
+        )
         self.assertEqual(FakeYoutubeDL.calls[1]["download"], True)
 
     def test_1080p_download_uses_height_selector(self):
         main.api_download("https://example.test/watch/1", quality=1080)
 
-        self.assertEqual(FakeYoutubeDL.calls[0]["format"], "bestvideo[height<=1080]+bestaudio/best[height<=1080]")
+        self.assertEqual(
+            FakeYoutubeDL.calls[0]["format"],
+            "best[height<=1080][ext=mp4]/best[height<=1080]/bestvideo[height<=1080]+bestaudio/best",
+        )
 
-    def test_separate_video_audio_streams_are_left_to_yt_dlp_to_merge(self):
+    def test_direct_mp4_is_preferred_before_video_audio_merge(self):
         main.api_download("https://example.test/watch/1", quality=1080)
 
         opts = FakeYoutubeDL.calls[0]
         self.assertEqual(opts["merge_output_format"], "mp4")
+        self.assertTrue(opts["format"].startswith("best[height<=1080][ext=mp4]/"))
         self.assertIn("+bestaudio", opts["format"])
+
+    def test_fragment_downloads_are_parallelized_for_hls_fallbacks(self):
+        main.api_download("https://example.test/watch/1", quality=1080)
+
+        self.assertEqual(FakeYoutubeDL.calls[0]["concurrent_fragment_downloads"], 8)
 
     def test_download_after_info_extracts_again_without_reusing_cdn_url(self):
         info = main.api_info("https://example.test/watch/1")
