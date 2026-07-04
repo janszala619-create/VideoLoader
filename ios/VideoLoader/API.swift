@@ -142,7 +142,7 @@ struct ServerAPI {
                 let h = "[height<=\(height)]"
                 selector = "b\(h)[vcodec^=avc1]\(direct)/b\(h)[ext=mp4]\(direct)/b\(h)\(direct)/b\(h)[vcodec^=avc1]/bv*\(h)[vcodec^=avc1]+ba[acodec^=mp4a]/b\(h)/bv*\(h)+ba/b"
             } else if let formatId = quality?.formatId, formatId != "best" {
-                selector = "\(formatId)/b[vcodec^=avc1]\(direct)/b[ext=mp4]\(direct)/b\(direct)/best"
+                selector = "b[vcodec^=avc1]\(direct)/b[ext=mp4]\(direct)/b\(direct)/\(formatId)/best"
             } else {
                 selector = "b[vcodec^=avc1]\(direct)/b[ext=mp4]\(direct)/b\(direct)/bv*[vcodec^=avc1]+ba[acodec^=mp4a]/b"
             }

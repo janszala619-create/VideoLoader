@@ -72,34 +72,68 @@ def api_info(url: str = Query(..., description="Link zum Video")):
     }
 
 
-def _build_format(height: int | None) -> str:
+def _format_attempts(height: int | None, format_id: str | None) -> list[str]:
     h = f"[height<={height}]" if height else ""
-    # Bevorzugt H.264 + AAC, damit das Video sicher in der iPhone-Galerie abspielbar ist
-    return (
-        f"bestvideo{h}[vcodec^=avc1]+bestaudio[acodec^=mp4a]/"
-        f"bestvideo{h}+bestaudio/"
-        f"best{h}/best"
-    )
+    direct = "[protocol!*=m3u8][protocol!*=dash]"
+    attempts = [
+        f"best{h}[vcodec^=avc1][acodec^=mp4a][ext=mp4]{direct}",
+        f"best{h}[ext=mp4]{direct}",
+        f"best{h}{direct}",
+        f"bestvideo{h}[vcodec^=avc1]+bestaudio[acodec^=mp4a]",
+        f"bestvideo{h}+bestaudio/best{h}/best",
+    ]
+
+    requested = (format_id or "").strip()
+    if requested and requested != "best":
+        attempts.insert(0, requested)
+    return list(dict.fromkeys(attempts))
+
+
+def _download_options(tmpdir: str, format_selector: str) -> dict:
+    return {
+        "quiet": True,
+        "no_warnings": True,
+        "noplaylist": True,
+        "format": format_selector,
+        "outtmpl": os.path.join(tmpdir, "video.%(ext)s"),
+        "merge_output_format": "mp4",
+        "postprocessors": [{"key": "FFmpegVideoRemuxer", "preferedformat": "mp4"}],
+        "retries": 5,
+        "fragment_retries": 5,
+        "extractor_retries": 3,
+        "file_access_retries": 3,
+        "socket_timeout": 30,
+    }
+
+
+def _clear_download_files(tmpdir: str) -> None:
+    for name in os.listdir(tmpdir):
+        path = os.path.join(tmpdir, name)
+        if os.path.isfile(path):
+            os.remove(path)
 
 
 @app.get("/api/download")
 def api_download(
     url: str = Query(..., description="Link zum Video"),
     height: int | None = Query(None, description="Maximale Auflösung, z. B. 1080"),
+    format_id: str | None = Query(None, description="Optionaler yt-dlp-Formatwähler"),
 ):
     tmpdir = tempfile.mkdtemp(prefix="videoloader_")
-    opts = {
-        "quiet": True,
-        "no_warnings": True,
-        "noplaylist": True,
-        "format": _build_format(height),
-        "outtmpl": os.path.join(tmpdir, "video.%(ext)s"),
-        "merge_output_format": "mp4",
-        "postprocessors": [{"key": "FFmpegVideoRemuxer", "preferedformat": "mp4"}],
-    }
+    info = None
+    last_error = None
     try:
-        with yt_dlp.YoutubeDL(opts) as ydl:
-            info = ydl.extract_info(url, download=True)
+        for format_selector in _format_attempts(height, format_id):
+            _clear_download_files(tmpdir)
+            opts = _download_options(tmpdir, format_selector)
+            try:
+                with yt_dlp.YoutubeDL(opts) as ydl:
+                    info = ydl.extract_info(url, download=True)
+                break
+            except Exception as exc:
+                last_error = exc
+        else:
+            raise last_error or RuntimeError("Keine passende Videoqualität gefunden.")
     except Exception as exc:
         shutil.rmtree(tmpdir, ignore_errors=True)
         raise HTTPException(status_code=422, detail=f"Download fehlgeschlagen: {exc}")
