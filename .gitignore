@@ -1,0 +1,12 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# macOS
+.DS_Store
+
+# Xcode
+ios/VideoLoader.xcodeproj/xcuserdata/
+ios/VideoLoader.xcodeproj/project.xcworkspace/xcuserdata/
+DerivedData/
