@@ -23,26 +23,42 @@ final class DownloadManager: NSObject, ObservableObject {
     private var fallbackURL: URL?
     private var fallbackUsed = false
     private var pendingTitle = "Video"
+    private var currentURL: URL?
+    private var retriesLeft = 0
 
     func start(url: URL, fallbackURL: URL? = nil, title: String = "Video") {
         task?.cancel()
         self.fallbackURL = fallbackURL
         fallbackUsed = false
         pendingTitle = title
+        currentURL = url
+        retriesLeft = 2
         phase = .waitingForServer
         task = session.downloadTask(with: url)
         task?.resume()
     }
 
+    /// Startet den zuletzt versuchten Download nach einer kurzen Pause erneut.
+    private func restart(after seconds: Double) {
+        update(.waitingForServer)
+        DispatchQueue.main.asyncAfter(deadline: .now() + seconds) {
+            guard let url = self.currentURL else { return }
+            self.task = self.session.downloadTask(with: url)
+            self.task?.resume()
+        }
+    }
+
     func cancel() {
         task?.cancel()
         task = nil
+        currentURL = nil
         update(.idle)
     }
 
     func reset() {
         task?.cancel()
         task = nil
+        currentURL = nil
         phase = .idle
     }
 
@@ -50,20 +66,30 @@ final class DownloadManager: NSObject, ObservableObject {
         DispatchQueue.main.async { self.phase = newPhase }
     }
 
-    /// Meldet einen Fehler – bei "Format nicht verfügbar" wird vorher automatisch
-    /// ein zweiter Versuch mit der besten verfügbaren Qualität gestartet.
-    private func fail(_ message: String) {
+    /// Meldet einen Fehler – versucht es vorher aber selbstständig erneut:
+    /// bei "Format nicht verfügbar" mit der besten Qualität, bei vorübergehenden
+    /// Fehlern (z. B. flüchtige Videoadressen mit HTTP 404) bis zu zweimal neu.
+    private func fail(_ message: String, transientHint: Bool = false) {
         if message.contains("Requested format is not available"),
            let fallbackURL, !fallbackUsed {
             fallbackUsed = true
-            update(.waitingForServer)
-            DispatchQueue.main.async {
-                self.task = self.session.downloadTask(with: fallbackURL)
-                self.task?.resume()
-            }
+            currentURL = fallbackURL
+            restart(after: 0)
+            return
+        }
+        if retriesLeft > 0, transientHint || Self.isTransient(message) {
+            retriesLeft -= 1
+            restart(after: 2)
             return
         }
         update(.failed(message))
+    }
+
+    /// Fehler, die erfahrungsgemäß beim nächsten Anlauf verschwinden können.
+    private static func isTransient(_ message: String) -> Bool {
+        let patterns = ["HTTP Error 404", "HTTP Error 403", "HTTP Error 429",
+                        "HTTP Error 5", "timed out", "unable to download"]
+        return patterns.contains { message.contains($0) }
     }
 
     /// Sichert ein bereits in der App gespeichertes Video zusätzlich in die Fotos-Galerie.
@@ -124,7 +150,8 @@ extension DownloadManager: URLSessionDownloadDelegate {
         guard let error else { return }
         let nsError = error as NSError
         guard nsError.code != NSURLErrorCancelled else { return }
-        update(.failed("Download fehlgeschlagen: \(error.localizedDescription)"))
+        // Netzwerkfehler (Abbrüche, Zeitüberschreitungen) sind meist vorübergehend
+        fail("Download fehlgeschlagen: \(error.localizedDescription)", transientHint: true)
     }
 
     /// Leitet die passende Dateiendung aus dem vom Server gemeldeten Typ ab.
