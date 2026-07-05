@@ -17,10 +17,10 @@ enum GlassStatusTone {
 
     var tint: Color {
         switch self {
-        case .neutral: return AppGlassColors.accentPrimary
-        case .success: return AppGlassColors.success
-        case .warning: return AppGlassColors.warning
-        case .error: return AppGlassColors.error
+        case .neutral: return AppColors.accentPrimary
+        case .success: return AppColors.success
+        case .warning: return AppColors.warning
+        case .error: return AppColors.error
         }
     }
 }
@@ -33,8 +33,8 @@ struct GlassStatusBanner: View {
     var action: (() -> Void)?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: AppGlassSpacing.md) {
-            HStack(alignment: .top, spacing: AppGlassSpacing.md) {
+        VStack(alignment: .leading, spacing: AppSpacing.md) {
+            HStack(alignment: .top, spacing: AppSpacing.md) {
                 ZStack {
                     Circle()
                         .fill(tone.tint.opacity(0.18))
@@ -44,32 +44,32 @@ struct GlassStatusBanner: View {
                 }
                 .frame(width: 44, height: 44)
 
-                VStack(alignment: .leading, spacing: AppGlassSpacing.xs) {
+                VStack(alignment: .leading, spacing: AppSpacing.xs) {
                     Text(title)
-                        .font(AppGlassTypography.headline)
-                        .foregroundStyle(AppGlassColors.textPrimary)
+                        .font(AppTypography.headline)
+                        .foregroundStyle(AppColors.textPrimary)
 
                     Text(message)
-                        .font(AppGlassTypography.footnote)
-                        .foregroundStyle(AppGlassColors.textSecondary)
+                        .font(AppTypography.footnote)
+                        .foregroundStyle(AppColors.textSecondary)
                 }
             }
 
             if let actionTitle, let action {
                 Button(actionTitle, action: action)
                     .buttonStyle(.borderless)
-                    .font(AppGlassTypography.footnote.weight(.semibold))
+                    .font(AppTypography.footnote.weight(.semibold))
                     .foregroundStyle(tone.tint)
             }
         }
-        .padding(AppGlassSpacing.lg)
+        .padding(AppSpacing.lg)
         .background(
-            RoundedRectangle(cornerRadius: AppGlassTheme.radiusLarge, style: .continuous)
-                .fill(AppGlassColors.glassSurfaceStrong)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: AppGlassTheme.radiusLarge, style: .continuous))
+            RoundedRectangle(cornerRadius: AppRadius.large, style: .continuous)
+                .fill(AppColors.surfaceStrong)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: AppRadius.large, style: .continuous))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: AppGlassTheme.radiusLarge, style: .continuous)
+            RoundedRectangle(cornerRadius: AppRadius.large, style: .continuous)
                 .stroke(tone.tint.opacity(0.24), lineWidth: 1)
         )
     }

@@ -28,33 +28,79 @@ jobs:
         run: python -m unittest discover -s tests
 
   ios:
-    name: iOS IPA build
-    runs-on: macos-latest
+    name: iOS Debug build check
+    runs-on: macos-15
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Build app for iPhone
+      - name: Show Xcode version
         run: |
-          xcodebuild \
+          xcode-select -p
+          xcodebuild -version
+
+      - name: List Xcode project
+        run: |
+          mkdir -p build/logs
+          set -o pipefail
+          xcodebuild -list -project ios/VideoLoader.xcodeproj | tee build/logs/xcodebuild-list.txt
+
+      - name: Resolve scheme
+        run: |
+          if ! grep -q "VideoLoader" build/logs/xcodebuild-list.txt; then
+            echo "::error::Expected scheme or target 'VideoLoader' was not listed by xcodebuild -list."
+            exit 1
+          fi
+          echo "SCHEME=VideoLoader" >> "$GITHUB_ENV"
+          echo "Using scheme: VideoLoader"
+
+      - name: Build VideoLoader app
+        shell: bash
+        run: |
+          mkdir -p build/logs
+          APP_LOG=build/logs/VideoLoader-app.log
+          set -o pipefail
+          if ! xcodebuild \
             -project ios/VideoLoader.xcodeproj \
-            -scheme VideoLoader \
-            -configuration Release \
+            -scheme "$SCHEME" \
+            -configuration Debug \
             -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
             CODE_SIGNING_ALLOWED=NO \
-            CONFIGURATION_BUILD_DIR="$PWD/build/Release-iphoneos" \
-            build
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            OTHER_CODE_SIGN_FLAGS="" \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            BUILD_DIR="$PWD/build" \
+            SYMROOT="$PWD/build" \
+            build 2>&1 | tee "$APP_LOG"; then
+            echo "::error::VideoLoader app build failed. Last 200 log lines:"
+            tail -n 200 "$APP_LOG"
+            exit 1
+          fi
 
-      - name: Package unsigned IPA
+      - name: Build ShareExtension
+        shell: bash
         run: |
-          mkdir -p build/ipa/Payload
-          cp -R build/Release-iphoneos/VideoLoader.app build/ipa/Payload/
-          cd build/ipa
-          zip -qry ../VideoLoader-unsigned.ipa Payload
-
-      - name: Upload IPA artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: VideoLoader-unsigned-ipa
-          path: build/VideoLoader-unsigned.ipa
+          mkdir -p build/logs
+          EXT_LOG=build/logs/ShareExtension.log
+          set -o pipefail
+          if ! xcodebuild \
+            -project ios/VideoLoader.xcodeproj \
+            -target ShareExtension \
+            -configuration Debug \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            OTHER_CODE_SIGN_FLAGS="" \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            BUILD_DIR="$PWD/build" \
+            SYMROOT="$PWD/build" \
+            build 2>&1 | tee "$EXT_LOG"; then
+            echo "::error::ShareExtension build failed. Last 200 log lines:"
+            tail -n 200 "$EXT_LOG"
+            exit 1
+          fi
