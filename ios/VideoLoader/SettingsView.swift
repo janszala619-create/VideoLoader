@@ -41,6 +41,9 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+            .neonScreenBackground()
+            .neonCardRow()
+            .preferredColorScheme(.dark)
             .navigationTitle("Einstellungen")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

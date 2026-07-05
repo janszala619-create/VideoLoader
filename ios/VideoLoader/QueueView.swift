@@ -19,8 +19,11 @@ struct QueueView: View {
                             row(job)
                         }
                     }
+                    .scrollContentBackground(.hidden)
+                    .listRowBackground(Theme.card)
                 }
             }
+            .background(Theme.background.ignoresSafeArea())
             .navigationTitle("Downloads")
             .toolbar {
                 if queue.jobs.contains(where: { $0.status == .done || $0.status == .failed }) {

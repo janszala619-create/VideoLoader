@@ -70,8 +70,11 @@ struct LibraryView: View {
                         }
                     }
                     .searchable(text: $searchText, prompt: "Videos durchsuchen")
+                    .scrollContentBackground(.hidden)
+                    .listRowBackground(Theme.card)
                 }
             }
+            .background(Theme.background.ignoresSafeArea())
             .navigationTitle("Meine Videos")
             .toolbar {
                 if !videos.isEmpty {

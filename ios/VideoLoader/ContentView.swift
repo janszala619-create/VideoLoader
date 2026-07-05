@@ -62,6 +62,8 @@ struct ContentView: View {
                     downloadSection
                 }
             }
+            .neonScreenBackground()
+            .neonCardRow()
             .navigationTitle("VideoLoader")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -262,8 +264,11 @@ struct ContentView: View {
                 enqueueDownload()
             } label: {
                 Label("Zur Warteschlange hinzufügen", systemImage: "arrow.down.circle.fill")
-                    .fontWeight(.semibold)
             }
+            .buttonStyle(GlowButtonStyle())
+            .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
+            .listRowBackground(Color.clear)
+
             Text("Der Download läuft im Hintergrund weiter – auch wenn du die App schließt oder das iPhone sperrst.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
