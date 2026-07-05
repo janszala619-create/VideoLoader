@@ -70,3 +70,29 @@ struct GlassInputField<Accessory: View>: View {
         }
     }
 }
+
+extension GlassInputField where Accessory == EmptyView {
+    /// Bequemer Initialisierer, wenn kein Zusatzelement neben dem Textfeld gebraucht wird.
+    init(
+        label: String,
+        placeholder: String,
+        text: Binding<String>,
+        helperText: String? = nil,
+        keyboardType: UIKeyboardType = .default,
+        textContentType: UITextContentType? = nil,
+        autocapitalization: TextInputAutocapitalization = .sentences,
+        disablesAutocorrection: Bool = false
+    ) {
+        self.init(
+            label: label,
+            placeholder: placeholder,
+            text: text,
+            helperText: helperText,
+            keyboardType: keyboardType,
+            textContentType: textContentType,
+            autocapitalization: autocapitalization,
+            disablesAutocorrection: disablesAutocorrection,
+            accessory: { EmptyView() }
+        )
+    }
+}

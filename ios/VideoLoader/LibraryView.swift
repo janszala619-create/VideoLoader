@@ -60,35 +60,8 @@ struct LibraryView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if videos.isEmpty {
-                    GlassEmptyStateView(
-                        title: "Noch keine Videos",
-                        message: "Lade im Tab „Laden“ ein Video herunter. Es erscheint dann hier und kann abgespielt, geteilt oder in Fotos gesichert werden.",
-                        systemImage: "film.stack"
-                    )
-                } else {
-                    if filteredVideos.isEmpty {
-                        GlassEmptyStateView(
-                            title: "Keine Treffer",
-                            message: "Für „\(searchText)“ wurde kein gespeichertes Video gefunden.",
-                            systemImage: "magnifyingglass"
-                        )
-                    } else {
-                        List {
-                            Section {
-                                overviewCard
-                                ForEach(filteredVideos) { video in
-                                    row(video)
-                                }
-                            }
-                        }
-                        .scrollContentBackground(.hidden)
-                    }
-                    .searchable(text: $searchText, prompt: "Videos durchsuchen")
-                }
-            }
-            .background(glassBackground.ignoresSafeArea())
+            mainContent
+                .background(glassBackground.ignoresSafeArea())
             .navigationTitle("Meine Videos")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
@@ -150,6 +123,46 @@ struct LibraryView: View {
                 Text(feedback ?? "")
             }
         }
+    }
+
+    /// In eine eigene Sub-View ausgelagert, weil der Compiler die tief
+    /// verschachtelte if/else-Struktur sonst nicht in vernünftiger Zeit
+    /// typprüfen konnte ("unable to type-check this expression").
+    @ViewBuilder
+    private var mainContent: some View {
+        if videos.isEmpty {
+            GlassEmptyStateView(
+                title: "Noch keine Videos",
+                message: "Lade im Tab „Laden“ ein Video herunter. Es erscheint dann hier und kann abgespielt, geteilt oder in Fotos gesichert werden.",
+                systemImage: "film.stack"
+            )
+        } else if filteredVideos.isEmpty {
+            GlassEmptyStateView(
+                title: "Keine Treffer",
+                message: emptySearchMessage,
+                systemImage: "magnifyingglass"
+            )
+            .searchable(text: $searchText, prompt: "Videos durchsuchen")
+        } else {
+            videoList
+                .searchable(text: $searchText, prompt: "Videos durchsuchen")
+        }
+    }
+
+    private var emptySearchMessage: String {
+        "Für „\(searchText)“ wurde kein gespeichertes Video gefunden."
+    }
+
+    private var videoList: some View {
+        List {
+            Section {
+                overviewCard
+                ForEach(filteredVideos) { video in
+                    row(video)
+                }
+            }
+        }
+        .scrollContentBackground(.hidden)
     }
 
     private var overviewCard: some View {
