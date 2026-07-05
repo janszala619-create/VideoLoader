@@ -1,6 +1,5 @@
 import SwiftUI
 import AVKit
-import Photos
 
 /// Sortierreihenfolge der Bibliothek.
 enum LibrarySort: String, CaseIterable, Identifiable {
@@ -26,6 +25,8 @@ struct LibraryView: View {
     @State private var renameTarget: DownloadedVideo?
     @State private var renameText = ""
     @State private var showDeleteAll = false
+    @State private var isLoading = true
+    @State private var loadError: String?
     @ObservedObject private var queue = DownloadQueue.shared
 
     /// Zahl der fertigen Downloads – ändert sie sich, wurde ein neues Video abgelegt.
@@ -50,12 +51,62 @@ struct LibraryView: View {
         ByteCountFormatter.string(fromByteCount: totalSize, countStyle: .file)
     }
 
+    private var latestVideoDateText: String? {
+        guard let latestDate = videos.map(\.date).max() else { return nil }
+        return latestDate.formatted(date: .abbreviated, time: .shortened)
+    }
+
+    private var overviewSubtitle: String {
+        if videos.isEmpty {
+            return "Neue Downloads erscheinen hier automatisch."
+        }
+        if searchText.isEmpty {
+            return "\(videos.count) gespeichert · \(totalSizeText) insgesamt"
+        }
+        return "\(filteredVideos.count) von \(videos.count) sichtbar"
+    }
+
     var body: some View {
         NavigationStack {
-            mainContent
-            .background(AppGlassBackground(glowAlignment: .topLeading))
+            ScrollView {
+                VStack(alignment: .leading, spacing: AppTheme.sectionSpacing) {
+                    headerBlock
+
+                    if isLoading && videos.isEmpty {
+                        LoadingStateView(
+                            title: "Bibliothek wird geladen",
+                            message: "Deine gespeicherten Videos werden gerade aus dem lokalen Archiv gelesen."
+                        )
+                        .accessibilityLabel("Bibliothek wird geladen")
+                    } else if let loadError, videos.isEmpty {
+                        ErrorStateView(
+                            title: "Bibliothek konnte nicht geladen werden",
+                            message: loadError,
+                            actionTitle: "Erneut versuchen",
+                            action: { Task { await refreshLibrary(showLoading: true) } }
+                        )
+                        .accessibilityLabel("Fehler beim Laden der Bibliothek")
+                    } else if videos.isEmpty {
+                        EmptyStateView(
+                            title: "Noch keine Medien",
+                            message: "Lade im Tab „Laden“ ein Video herunter. Sobald der Download fertig ist, erscheint es hier und kann geöffnet, geteilt oder gelöscht werden.",
+                            systemImage: "film.stack"
+                        )
+                        .accessibilityLabel("Leere Mediathek")
+                    } else {
+                        overviewCard
+                        mediaSection
+                    }
+                }
+                .padding(.horizontal, AppTheme.screenPadding)
+                .padding(.top, AppSpacing.md)
+            }
+            .background(libraryBackground)
             .navigationTitle("Meine Videos")
             .navigationBarTitleDisplayMode(.large)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarBackground(AppTheme.navBarMaterial, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
                 if !videos.isEmpty {
                     ToolbarItem(placement: .topBarTrailing) {
@@ -73,13 +124,18 @@ struct LibraryView: View {
                             }
                         } label: {
                             Image(systemName: "ellipsis.circle")
-                                .foregroundStyle(AppGlassColors.textPrimary)
+                                .foregroundStyle(AppColors.textPrimary)
                         }
                     }
                 }
             }
-            .onAppear(perform: reload)
-            .onChange(of: doneCount) { _, _ in reload() }
+            .searchable(text: $searchText, prompt: "Videos durchsuchen")
+            .task {
+                await refreshLibrary(showLoading: true)
+            }
+            .onChange(of: doneCount) { _, _ in
+                Task { await refreshLibrary() }
+            }
             .fullScreenCover(item: $selectedVideo) { video in
                 ZStack(alignment: .topTrailing) {
                     PlayerView(url: video.url)
@@ -89,7 +145,7 @@ struct LibraryView: View {
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.title)
-                            .foregroundStyle(.white, .black.opacity(0.5))
+                            .foregroundStyle(AppColors.textPrimary, AppColors.overlay)
                             .padding()
                     }
                     .accessibilityLabel("Player schließen")
@@ -104,7 +160,7 @@ struct LibraryView: View {
                 Button("Abbrechen", role: .cancel) {}
                 Button("Alle löschen", role: .destructive) {
                     DownloadLibrary.deleteAll()
-                    reload()
+                    Task { await refreshLibrary() }
                 }
             } message: {
                 Text("Dadurch werden alle \(videos.count) Videos aus der App entfernt. In der Fotos-Galerie gesicherte Videos bleiben erhalten.")
@@ -117,112 +173,145 @@ struct LibraryView: View {
         }
     }
 
-    /// In eine eigene Sub-View ausgelagert, weil die verschachtelte if/else-
-    /// Struktur sonst den Compiler unnötig belastet.
-    @ViewBuilder
-    private var mainContent: some View {
-        if videos.isEmpty {
-            GlassEmptyStateView(
-                title: "Noch keine Videos",
-                message: "Lade im Tab „Laden“ ein Video herunter. Es erscheint dann hier und kann abgespielt, geteilt oder in Fotos gesichert werden.",
-                systemImage: "film.stack"
-            )
-        } else if filteredVideos.isEmpty {
-            GlassEmptyStateView(
-                title: "Keine Treffer",
-                message: emptySearchMessage,
-                systemImage: "magnifyingglass"
-            )
-            .searchable(text: $searchText, prompt: "Videos durchsuchen")
-        } else {
-            libraryContent
-                .searchable(text: $searchText, prompt: "Videos durchsuchen")
-        }
-    }
+    private var headerBlock: some View {
+        VStack(alignment: .leading, spacing: AppSpacing.sm) {
+            Text("Mediathek")
+                .font(AppTypography.largeTitle)
+                .foregroundStyle(AppColors.textPrimary)
+                .accessibilityAddTraits(.isHeader)
 
-    private var emptySearchMessage: String {
-        "Für „\(searchText)“ wurde kein gespeichertes Video gefunden."
-    }
-    private var libraryContent: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: AppGlassTheme.sectionSpacing) {
-                overviewCard
-
-                VStack(spacing: AppGlassSpacing.md) {
-                    ForEach(filteredVideos) { video in
-                        row(video)
-                    }
-                }
-            }
-            .padding(.horizontal, AppGlassTheme.screenPadding)
-            .padding(.top, AppGlassSpacing.md)
+            Text("Alle gespeicherten Videos an einem Ort. Suche, sortiere und öffne deine Downloads direkt aus der Bibliothek.")
+                .font(AppTypography.body)
+                .foregroundStyle(AppColors.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
     private var overviewCard: some View {
-        AppGlassHeroCard(
-            title: "Mediathek",
-            subtitle: "\(videos.count) Video\(videos.count == 1 ? "" : "s") gespeichert"
-        ) {
-                Text(totalSizeText)
-                    .font(AppGlassTypography.subheadline)
-                    .foregroundStyle(AppGlassColors.textPrimary)
-                    .padding(.horizontal, AppGlassSpacing.md)
-                    .padding(.vertical, AppGlassSpacing.sm)
-                    .background(
-                        Capsule(style: .continuous)
-                            .fill(AppGlassColors.glassSurfaceStrong)
-                    )
-                    .overlay(
-                        Capsule(style: .continuous)
-                            .stroke(AppGlassColors.glassBorder, lineWidth: 1)
-                    )
+        AppCard {
+            SectionHeader(
+                title: "Übersicht",
+                subtitle: overviewSubtitle
+            )
+
+            LazyVGrid(
+                columns: [
+                    GridItem(.flexible(), spacing: AppSpacing.md),
+                    GridItem(.flexible(), spacing: AppSpacing.md)
+                ],
+                spacing: AppSpacing.md
+            ) {
+                LibraryMetricCard(
+                    title: "Videos",
+                    value: "\(videos.count)",
+                    tint: AppColors.accentPrimary,
+                    systemImage: "film.stack.fill"
+                )
+                LibraryMetricCard(
+                    title: "Größe",
+                    value: totalSizeText,
+                    tint: AppColors.info,
+                    systemImage: "externaldrive.fill"
+                )
+                LibraryMetricCard(
+                    title: "Neueste",
+                    value: latestVideoDateText ?? "—",
+                    tint: AppColors.success,
+                    systemImage: "clock.fill"
+                )
+                LibraryMetricCard(
+                    title: "Sortierung",
+                    value: sort.label,
+                    tint: AppColors.warning,
+                    systemImage: "arrow.up.arrow.down"
+                )
+            }
         }
     }
 
-    private func row(_ video: DownloadedVideo) -> some View {
-        GlassCard {
-            HStack(alignment: .top, spacing: AppGlassSpacing.md) {
-                VideoThumbnail(url: video.url)
+    private var mediaSection: some View {
+        VStack(alignment: .leading, spacing: AppSpacing.md) {
+            SectionHeader(
+                title: "Medien",
+                subtitle: filteredVideos.isEmpty
+                ? "Keine Treffer für \(searchText)."
+                : "\(filteredVideos.count) gespeicherte Medien"
+            )
 
-                VStack(alignment: .leading, spacing: AppGlassSpacing.xs) {
-                    Text(video.name)
-                        .font(AppGlassTypography.headline)
-                        .foregroundStyle(AppGlassColors.textPrimary)
-                        .lineLimit(2)
-                    Text("\(video.sizeText) · \(video.date.formatted(date: .abbreviated, time: .shortened))")
-                        .font(AppGlassTypography.footnote)
-                        .foregroundStyle(AppGlassColors.textSecondary)
+            if filteredVideos.isEmpty {
+                EmptyStateView(
+                    title: "Keine Treffer",
+                    message: emptySearchMessage,
+                    systemImage: "magnifyingglass",
+                    actionTitle: "Suche löschen",
+                    action: { searchText = "" }
+                )
+                .accessibilityLabel("Keine gespeicherten Videos für die aktuelle Suche")
+            } else {
+                LazyVStack(spacing: AppSpacing.md) {
+                    ForEach(filteredVideos) { video in
+                        mediaCard(for: video)
+                    }
                 }
-
-                Spacer(minLength: 0)
             }
-
-            HStack(spacing: AppGlassSpacing.md) {
-                Button {
-                    selectedVideo = video
-                } label: {
-                    Label("Abspielen", systemImage: "play.fill")
-                }
-                .buttonStyle(GlassPrimaryButtonStyle())
-
-                ShareLink(item: video.url) {
-                    Label("Teilen", systemImage: "square.and.arrow.up")
-                }
-                .buttonStyle(GlassSecondaryButtonStyle())
-            }
-
-            Button {
-                saveToPhotos(video)
-            } label: {
-                Label("In Fotos sichern", systemImage: "photo.badge.plus")
-            }
-            .buttonStyle(.borderless)
-            .font(AppGlassTypography.footnote.weight(.semibold))
-            .foregroundStyle(AppGlassColors.accentSecondary)
         }
-        .contentShape(Rectangle())
-        .onTapGesture { selectedVideo = video }
+    }
+
+    private func mediaCard(for video: DownloadedVideo) -> some View {
+        AppCard {
+            VStack(alignment: .leading, spacing: AppSpacing.md) {
+                HStack(alignment: .top, spacing: AppSpacing.md) {
+                    VideoThumbnail(url: video.url)
+
+                    VStack(alignment: .leading, spacing: AppSpacing.xs) {
+                        Text(video.name)
+                            .font(AppTypography.headline)
+                            .foregroundStyle(AppColors.textPrimary)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                            .accessibilityAddTraits(.isHeader)
+
+                        HStack(spacing: AppSpacing.sm) {
+                            Label(video.sizeText, systemImage: "externaldrive")
+                            Label(video.date.formatted(date: .abbreviated, time: .shortened), systemImage: "calendar")
+                        }
+                        .font(AppTypography.footnote)
+                        .foregroundStyle(AppColors.textSecondary)
+                        .labelStyle(.titleAndIcon)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                    }
+
+                    Spacer(minLength: 0)
+                }
+
+                HStack(spacing: AppSpacing.sm) {
+                    Button {
+                        selectedVideo = video
+                    } label: {
+                        Label("Öffnen", systemImage: "play.fill")
+                    }
+                    .buttonStyle(PrimaryButton())
+
+                    ShareLink(item: video.url) {
+                        Label("Teilen", systemImage: "square.and.arrow.up")
+                    }
+                    .buttonStyle(SecondaryButton())
+                }
+
+                Text("Weitere Aktionen über das Kontextmenü oder Wischen nach links.")
+                    .font(AppTypography.footnote)
+                    .foregroundStyle(AppColors.textTertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .contentShape(Rectangle())
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("\(video.name), \(video.sizeText), \(video.date.formatted(date: .abbreviated, time: .shortened))")
+            .onTapGesture {
+                selectedVideo = video
+            }
+
+        }
         .contextMenu {
             Button {
                 startRename(video)
@@ -251,7 +340,7 @@ struct LibraryView: View {
             } label: {
                 Label("Umbenennen", systemImage: "pencil")
             }
-            .tint(AppGlassColors.accentPrimary)
+            .tint(AppColors.accentPrimary)
         }
     }
 
@@ -271,13 +360,47 @@ struct LibraryView: View {
         )
     }
 
-    private func reload() {
-        videos = DownloadLibrary.list()
+    @MainActor
+    private func refreshLibrary(showLoading: Bool = false) async {
+        loadError = nil
+        if showLoading {
+            isLoading = true
+            await Task.yield()
+        }
+
+        do {
+            videos = try loadVideos()
+        } catch {
+            videos = []
+            loadError = error.localizedDescription
+        }
+
+        isLoading = false
+    }
+
+    private func loadVideos() throws -> [DownloadedVideo] {
+        let urls = try FileManager.default.contentsOfDirectory(
+            at: DownloadLibrary.directory,
+            includingPropertiesForKeys: [.contentModificationDateKey, .fileSizeKey]
+        )
+        let videoExtensions: Set<String> = ["mp4", "mov", "m4v", "webm", "mkv", "avi"]
+        return urls
+            .filter { videoExtensions.contains($0.pathExtension.lowercased()) }
+            .map { url in
+                let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey])
+                return DownloadedVideo(
+                    url: url,
+                    name: url.deletingPathExtension().lastPathComponent,
+                    size: Int64(values?.fileSize ?? 0),
+                    date: values?.contentModificationDate ?? .distantPast
+                )
+            }
+            .sorted { $0.date > $1.date }
     }
 
     private func remove(_ video: DownloadedVideo) {
         try? FileManager.default.removeItem(at: video.url)
-        reload()
+        Task { await refreshLibrary() }
     }
 
     private func startRename(_ video: DownloadedVideo) {
@@ -290,7 +413,7 @@ struct LibraryView: View {
         let newName = renameText.trimmingCharacters(in: .whitespaces)
         if !newName.isEmpty, newName != video.name {
             DownloadLibrary.rename(video, to: newName)
-            reload()
+            Task { await refreshLibrary() }
         }
         renameTarget = nil
     }
@@ -299,6 +422,35 @@ struct LibraryView: View {
         DownloadManager.saveToPhotos(fileURL: video.url) { errorMessage in
             feedback = errorMessage ?? "„\(video.name)“ wurde in die Fotos-Galerie gesichert."
         }
+    }
+
+    private var emptySearchMessage: String {
+        "Für „\(searchText)“ wurde kein gespeichertes Video gefunden."
+    }
+
+    private var libraryBackground: some View {
+        ZStack {
+            LinearGradient(
+                colors: [AppColors.background, AppColors.backgroundSoft, AppColors.background],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            RadialGradient(
+                colors: [AppColors.backgroundGlow.opacity(0.30), .clear],
+                center: .topTrailing,
+                startRadius: 20,
+                endRadius: 320
+            )
+
+            RadialGradient(
+                colors: [AppColors.accentGlow.opacity(0.18), .clear],
+                center: .bottomLeading,
+                startRadius: 40,
+                endRadius: 260
+            )
+        }
+        .ignoresSafeArea()
     }
 }
 
@@ -315,19 +467,20 @@ struct VideoThumbnail: View {
                     .aspectRatio(contentMode: .fill)
             } else {
                 Rectangle()
-                    .fill(AppGlassColors.glassSurfaceStrong)
+                    .fill(AppColors.surfaceStrong)
                     .overlay {
                         Image(systemName: "film")
-                            .foregroundStyle(AppGlassColors.textTertiary)
+                            .foregroundStyle(AppColors.textTertiary)
                     }
             }
         }
         .frame(width: 104, height: 60)
-        .clipShape(RoundedRectangle(cornerRadius: AppGlassTheme.radiusMedium, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: AppRadius.medium, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: AppGlassTheme.radiusMedium, style: .continuous)
-                .stroke(AppGlassColors.glassBorder, lineWidth: 1)
+            RoundedRectangle(cornerRadius: AppRadius.medium, style: .continuous)
+                .stroke(AppColors.border, lineWidth: 1)
         )
+        .accessibilityHidden(true)
         .task {
             if image == nil {
                 image = await Self.generate(for: url)
@@ -344,6 +497,46 @@ struct VideoThumbnail: View {
                 continuation.resume(returning: cgImage.map(UIImage.init))
             }
         }
+    }
+}
+
+private struct LibraryMetricCard: View {
+    let title: String
+    let value: String
+    let tint: Color
+    let systemImage: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: AppSpacing.sm) {
+            HStack(spacing: AppSpacing.sm) {
+                Image(systemName: systemImage)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(tint)
+
+                Text(title)
+                    .font(AppTypography.caption)
+                    .foregroundStyle(AppColors.textSecondary)
+            }
+
+            Text(value)
+                .font(AppTypography.callout.weight(.semibold))
+                .foregroundStyle(AppColors.textPrimary)
+                .lineLimit(2)
+                .minimumScaleFactor(0.85)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(AppSpacing.md)
+        .background(
+            RoundedRectangle(cornerRadius: AppRadius.medium, style: .continuous)
+                .fill(AppColors.surfaceStrong)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: AppRadius.medium, style: .continuous)
+                .stroke(tint.opacity(0.18), lineWidth: 1)
+        )
+        .appShadow(AppShadow.elevated)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(title): \(value)")
     }
 }
 

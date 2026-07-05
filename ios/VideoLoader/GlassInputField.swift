@@ -35,15 +35,15 @@ struct GlassInputField<Accessory: View>: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: AppGlassSpacing.sm) {
+        VStack(alignment: .leading, spacing: AppSpacing.sm) {
             Text(label)
-                .font(AppGlassTypography.subheadline.weight(.semibold))
-                .foregroundStyle(AppGlassColors.textPrimary)
+                .font(AppTypography.subheadline.weight(.semibold))
+                .foregroundStyle(AppColors.textPrimary)
 
-            HStack(spacing: AppGlassSpacing.sm) {
+            HStack(spacing: AppSpacing.sm) {
                 TextField(placeholder, text: $text)
-                    .font(AppGlassTypography.body)
-                    .foregroundStyle(AppGlassColors.textPrimary)
+                    .font(AppTypography.body)
+                    .foregroundStyle(AppColors.textPrimary)
                     .keyboardType(keyboardType)
                     .textContentType(textContentType)
                     .textInputAutocapitalization(autocapitalization)
@@ -51,21 +51,21 @@ struct GlassInputField<Accessory: View>: View {
 
                 accessory
             }
-            .padding(.horizontal, AppGlassSpacing.md)
-            .frame(minHeight: AppGlassTheme.controlHeight)
+            .padding(.horizontal, AppSpacing.md)
+            .frame(minHeight: AppTheme.controlHeight)
             .background(
-                RoundedRectangle(cornerRadius: AppGlassTheme.radiusMedium, style: .continuous)
-                    .fill(AppGlassColors.glassSurfaceStrong)
+                RoundedRectangle(cornerRadius: AppRadius.medium, style: .continuous)
+                    .fill(AppColors.surfaceElevated)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: AppGlassTheme.radiusMedium, style: .continuous)
-                    .stroke(AppGlassColors.glassBorder, lineWidth: 1)
+                RoundedRectangle(cornerRadius: AppRadius.medium, style: .continuous)
+                    .stroke(AppColors.border, lineWidth: 1)
             )
 
             if let helperText {
                 Text(helperText)
-                    .font(AppGlassTypography.footnote)
-                    .foregroundStyle(AppGlassColors.textSecondary)
+                    .font(AppTypography.footnote)
+                    .foregroundStyle(AppColors.textSecondary)
             }
         }
     }

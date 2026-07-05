@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="22505" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" launchScreen="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="VC-1">
+    <device id="retina5_5" orientation="portrait" appearance="dark"/>
+    <dependencies>
+        <deployment identifier="iOS"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="22505"/>
+        <capability name="Safe area layout guides" minToolsVersion="9.0"/>
+        <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
+    </dependencies>
+    <scenes>
+        <!--View Controller-->
+        <scene sceneID="SCENE-1">
+            <objects>
+                <viewController id="VC-1" sceneMemberID="viewController">
+                    <view key="view" contentMode="scaleToFill" id="VIEW-1">
+                        <rect key="frame" x="0.0" y="0.0" width="375" height="812"/>
+                        <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                        <subviews>
+                            <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" image="LaunchScreenIcon" translatesAutoresizingMaskIntoConstraints="NO" id="ICON-1">
+                                <rect key="frame" x="127.5" y="328" width="120" height="120"/>
+                            </imageView>
+                        </subviews>
+                        <viewLayoutGuide key="safeArea" id="SAFE-1"/>
+                        <color key="backgroundColor" red="0.01568627451" green="0.02352941176" blue="0.0431372549" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                        <constraints>
+                            <constraint firstItem="ICON-1" firstAttribute="centerX" secondItem="VIEW-1" secondAttribute="centerX" id="C1"/>
+                            <constraint firstItem="ICON-1" firstAttribute="centerY" secondItem="VIEW-1" secondAttribute="centerY" id="C2"/>
+                            <constraint firstItem="ICON-1" firstAttribute="width" constant="120" id="C3"/>
+                            <constraint firstItem="ICON-1" firstAttribute="height" constant="120" id="C4"/>
+                        </constraints>
+                    </view>
+                </viewController>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="FR-1" userLabel="First Responder" sceneMemberID="firstResponder"/>
+            </objects>
+            <point key="canvasLocation" x="0.0" y="0.0"/>
+        </scene>
+    </scenes>
+    <resources>
+        <image name="LaunchScreenIcon" width="1024" height="1024"/>
+    </resources>
+</document>
