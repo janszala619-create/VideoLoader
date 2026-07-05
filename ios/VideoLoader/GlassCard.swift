@@ -26,10 +26,12 @@ struct GlassCard<Content: View>: View {
                         endPoint: .bottomTrailing
                     )
                 )
+                .allowsHitTesting(false)
         )
         .overlay(
             RoundedRectangle(cornerRadius: AppGlassTheme.radiusLarge, style: .continuous)
                 .stroke(AppGlassColors.glassBorder, lineWidth: 1)
+                .allowsHitTesting(false)
         )
         .shadow(
             color: AppGlassShadows.card.color,
