@@ -24,13 +24,3 @@ enum AppGlassColors {
     static let warning = Color(hex: 0xF59E0B)
     static let error = Color(hex: 0xF43F5E)
 }
-
-private extension Color {
-    init(hex: UInt32) {
-        self.init(
-            red: Double((hex >> 16) & 0xFF) / 255,
-            green: Double((hex >> 8) & 0xFF) / 255,
-            blue: Double(hex & 0xFF) / 255
-        )
-    }
-}
