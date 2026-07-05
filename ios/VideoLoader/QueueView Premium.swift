@@ -40,7 +40,7 @@ struct QueueViewPremium: View {
                     .font(.headline.weight(.semibold))
                     .foregroundStyle(AppColorsPremium.textPrimary)
 
-                Text("Starten Sie einen Download im Tab „Laden", um ihn hier zu sehen.")
+                Text("Starten Sie einen Download im Tab \"Laden\", um ihn hier zu sehen.")
                     .font(.subheadline)
                     .foregroundStyle(AppColorsPremium.textSecondary)
                     .multilineTextAlignment(.center)
@@ -138,7 +138,7 @@ struct QueueViewPremium: View {
                     .foregroundStyle(AppColorsPremium.success)
                     .font(.caption)
 
-                Text("In „Meine Videos" verfügbar")
+                Text("In \"Meine Videos\" verfügbar")
                     .font(.caption)
                     .foregroundStyle(AppColorsPremium.success)
 
