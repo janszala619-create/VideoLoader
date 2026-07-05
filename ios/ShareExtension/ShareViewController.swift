@@ -37,12 +37,14 @@ class ShareViewController: UIViewController {
     }
 
     private func finish(with link: String?) {
-        if let link, let appURL = Self.appURL(forLink: link) {
-            openHostApp(appURL)
-        }
-        // Kurze Verzögerung, damit das Öffnen der App nicht abgebrochen wird.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            self.extensionContext?.completeRequest(returningItems: nil)
+        DispatchQueue.main.async {
+            if let link, let appURL = Self.appURL(forLink: link) {
+                self.openHostApp(appURL)
+            }
+            // Kurze Verzögerung, damit das Öffnen der App nicht abgebrochen wird.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                self.extensionContext?.completeRequest(returningItems: nil)
+            }
         }
     }
 
@@ -54,13 +56,19 @@ class ShareViewController: UIViewController {
     }
 
     /// Öffnet die Host-App über die Responder-Kette (Extensions haben kein
-    /// UIApplication.shared).
+    /// UIApplication.shared). Der Aufruf über den openURL:-Selektor ist die
+    /// zuverlässige Variante, die auch aus Share Extensions funktioniert.
     @discardableResult
     private func openHostApp(_ url: URL) -> Bool {
+        let selector = NSSelectorFromString("openURL:")
         var responder: UIResponder? = self
         while let current = responder {
             if let application = current as? UIApplication {
-                application.open(url, options: [:], completionHandler: nil)
+                if application.responds(to: selector) {
+                    application.perform(selector, with: url)
+                } else {
+                    application.open(url, options: [:], completionHandler: nil)
+                }
                 return true
             }
             responder = current.next

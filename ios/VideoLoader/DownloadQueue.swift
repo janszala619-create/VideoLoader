@@ -61,7 +61,7 @@ final class DownloadQueue: NSObject, ObservableObject {
     private override init() {
         super.init()
         loadFromDisk()
-        reconnect()
+        resumeIfNeeded()
     }
 
     // MARK: - Öffentliche Aktionen
@@ -207,15 +207,18 @@ final class DownloadQueue: NSObject, ObservableObject {
         return patterns.contains { message.localizedCaseInsensitiveContains($0) }
     }
 
-    // MARK: - Nach App-Neustart wieder andocken
+    // MARK: - Nach App-Neustart / Rückkehr in den Vordergrund wieder andocken
 
-    private func reconnect() {
+    /// Prüft, ob unfertige Downloads offen sind, und setzt sie fort. Wird beim
+    /// Start und bei jeder Rückkehr in den Vordergrund aufgerufen. Downloads,
+    /// die iOS beim Schließen der App abgebrochen hat, werden neu gestartet.
+    func resumeIfNeeded() {
         session.getAllTasks { tasks in
             let runningIDs = Set(tasks.compactMap { $0.taskDescription.flatMap(UUID.init(uuidString:)) })
             DispatchQueue.main.async {
                 for index in self.jobs.indices {
-                    // Aufträge, die „läuft“ waren, aber keine laufende Aufgabe mehr
-                    // haben, zurück in die Warteschlange stellen.
+                    // Aufträge, die „läuft” waren, aber keine laufende Aufgabe mehr
+                    // haben, zurück in die Warteschlange stellen (neu starten).
                     if self.jobs[index].status == .running,
                        !runningIDs.contains(self.jobs[index].id) {
                         self.jobs[index].status = .waiting

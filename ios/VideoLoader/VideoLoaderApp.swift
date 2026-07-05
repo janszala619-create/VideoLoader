@@ -4,6 +4,7 @@ import SwiftUI
 struct VideoLoaderApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @ObservedObject private var queue = DownloadQueue.shared
+    @Environment(\.scenePhase) private var scenePhase
 
     @State private var selectedTab = 0
     @State private var pendingLink: String?
@@ -39,6 +40,12 @@ struct VideoLoaderApp: App {
                 if let link = Self.parseSharedLink(from: url) {
                     pendingLink = link
                     selectedTab = 0
+                }
+            }
+            .onChange(of: scenePhase) { _, phase in
+                // Beim Zurückkehren in den Vordergrund unfertige Downloads fortsetzen
+                if phase == .active {
+                    queue.resumeIfNeeded()
                 }
             }
         }
