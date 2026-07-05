@@ -350,7 +350,7 @@ struct ContentView: View {
                         } label: {
                             Image(systemName: "play.circle.fill")
                                 .font(.system(size: 56))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(AppColors.textPrimary)
                                 .shadow(color: AppColors.accentGlow, radius: 18, x: 0, y: 6)
                         }
                         .accessibilityLabel("Videovorschau abspielen")

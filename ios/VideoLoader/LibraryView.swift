@@ -145,7 +145,7 @@ struct LibraryView: View {
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.title)
-                            .foregroundStyle(.white, .black.opacity(0.5))
+                            .foregroundStyle(AppColors.textPrimary, AppColors.overlay)
                             .padding()
                     }
                     .accessibilityLabel("Player schließen")

@@ -6,7 +6,7 @@ struct PrimaryButton: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(AppTypography.button)
-            .foregroundStyle(.white)
+            .foregroundStyle(AppColors.textPrimary)
             .frame(maxWidth: .infinity, minHeight: AppTheme.controlHeight)
             .padding(.horizontal, AppSpacing.lg)
             .background(
