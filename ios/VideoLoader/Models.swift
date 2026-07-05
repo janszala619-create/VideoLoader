@@ -76,15 +76,19 @@ enum DownloadLibrary {
             .sorted { $0.date > $1.date }
     }
 
-    /// Baut aus dem Videotitel einen sicheren, noch freien Dateinamen.
-    static func makeDestination(title: String, fileExtension: String = "mp4") -> URL {
+    /// Macht aus einem beliebigen Titel einen dateisystem-sicheren Namen.
+    static func safeName(_ title: String) -> String {
         var safe = String(title.map { char in
             char.isLetter || char.isNumber || char == " " || char == "-" || char == "_" ? char : " "
         })
         safe = safe.trimmingCharacters(in: .whitespaces)
         if safe.count > 60 { safe = String(safe.prefix(60)).trimmingCharacters(in: .whitespaces) }
-        if safe.isEmpty { safe = "Video" }
+        return safe.isEmpty ? "Video" : safe
+    }
 
+    /// Baut aus dem Videotitel einen sicheren, noch freien Dateinamen.
+    static func makeDestination(title: String, fileExtension: String = "mp4") -> URL {
+        let safe = safeName(title)
         var url = directory.appendingPathComponent(safe).appendingPathExtension(fileExtension)
         var counter = 2
         while FileManager.default.fileExists(atPath: url.path) {
@@ -92,6 +96,33 @@ enum DownloadLibrary {
             counter += 1
         }
         return url
+    }
+
+    /// Benennt ein Video um (Endung bleibt erhalten). Gibt bei Erfolg die neue Adresse zurück.
+    @discardableResult
+    static func rename(_ video: DownloadedVideo, to newTitle: String) -> URL? {
+        let ext = video.url.pathExtension
+        let safe = safeName(newTitle)
+        var target = directory.appendingPathComponent(safe).appendingPathExtension(ext)
+        var counter = 2
+        while FileManager.default.fileExists(atPath: target.path), target != video.url {
+            target = directory.appendingPathComponent("\(safe) \(counter)").appendingPathExtension(ext)
+            counter += 1
+        }
+        if target == video.url { return video.url }
+        do {
+            try FileManager.default.moveItem(at: video.url, to: target)
+            return target
+        } catch {
+            return nil
+        }
+    }
+
+    /// Löscht alle Videos in der Bibliothek.
+    static func deleteAll() {
+        for video in list() {
+            try? FileManager.default.removeItem(at: video.url)
+        }
     }
 }
 

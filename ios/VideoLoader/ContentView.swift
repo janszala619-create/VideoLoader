@@ -14,6 +14,7 @@ struct ContentView: View {
     @State private var showSettings = false
     @State private var showPreviewPlayer = false
     @State private var justQueuedTitle: String?
+    @State private var serverOnline: Bool?      // nil = wird gerade geprüft
 
     @ObservedObject private var queue = DownloadQueue.shared
 
@@ -86,6 +87,7 @@ struct ContentView: View {
             }
             .onAppear {
                 if activeBaseURL.isEmpty { showSettings = true }
+                Task { await checkServer() }
             }
         }
     }
@@ -102,8 +104,52 @@ struct ContentView: View {
             .pickerStyle(.segmented)
             .onChange(of: activeServerRaw) { _, _ in
                 info = nil
+                Task { await checkServer() }
+            }
+
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(serverStatusColor)
+                    .frame(width: 10, height: 10)
+                Text(serverStatusText)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button {
+                    Task { await checkServer() }
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.footnote)
+                }
+                .buttonStyle(.borderless)
             }
         }
+    }
+
+    private var serverStatusColor: Color {
+        switch serverOnline {
+        case .some(true): return .green
+        case .some(false): return .red
+        case .none: return .gray
+        }
+    }
+
+    private var serverStatusText: String {
+        switch serverOnline {
+        case .some(true): return "Server erreichbar"
+        case .some(false): return "Server nicht erreichbar – Adresse in den Einstellungen prüfen"
+        case .none: return "Server wird geprüft …"
+        }
+    }
+
+    private func checkServer() async {
+        serverOnline = nil
+        guard !activeBaseURL.trimmingCharacters(in: .whitespaces).isEmpty else {
+            serverOnline = false
+            return
+        }
+        let api = ServerAPI(kind: activeServer, baseURL: activeBaseURL)
+        serverOnline = await api.isReachable()
     }
 
     private var linkSection: some View {

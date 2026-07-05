@@ -11,5 +11,9 @@
 	<string>Die App speichert heruntergeladene Videos in deiner Fotos-Galerie.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Die App verbindet sich mit deinem VideoLoader-Server im Heimnetzwerk.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+	</array>
 </dict>
 </plist>

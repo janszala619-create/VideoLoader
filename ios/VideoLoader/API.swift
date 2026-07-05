@@ -145,6 +145,29 @@ struct ServerAPI {
         }
     }
 
+    // MARK: - Erreichbarkeit (für die Server-Ampel)
+
+    /// Prüft mit kurzem Zeitlimit, ob der Server antwortet. Jede HTTP-Antwort
+    /// (auch 404) zählt als erreichbar – nur ein Verbindungsfehler ist „offline“.
+    func isReachable() async -> Bool {
+        var components: URLComponents
+        do { components = try normalizedBase() } catch { return false }
+        components.path = "/health"
+        guard let healthURL = components.url else { return false }
+
+        var request = URLRequest(url: healthURL)
+        request.timeoutInterval = 6
+        let config = URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForRequest = 6
+        let session = URLSession(configuration: config)
+        do {
+            let (_, response) = try await session.data(for: request)
+            return response is HTTPURLResponse
+        } catch {
+            return false
+        }
+    }
+
     // MARK: - Hilfen
 
     private func get(_ endpoint: URL) async throws -> (Data, URLResponse) {
