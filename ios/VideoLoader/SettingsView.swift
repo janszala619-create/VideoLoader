@@ -6,97 +6,177 @@ struct SettingsView: View {
     @Binding var activeServerRaw: String
     @Environment(\.dismiss) private var dismiss
 
+    private var activeServer: ServerKind? {
+        ServerKind(rawValue: activeServerRaw)
+    }
+
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: AppThemePremium.sectionSpacing) {
-                    PremiumGlassCard {
-                        VStack(alignment: .leading, spacing: AppThemePremium.md) {
-                            Text("Aktiver Server")
-                                .font(.headline)
+            ZStack {
+                PremiumAuroraBackground()
+
+                ScrollView {
+                    VStack(spacing: AppThemePremium.xl) {
+
+                        // MARK: - Header
+                        VStack(alignment: .leading, spacing: AppThemePremium.sm) {
+                            Text("Server-Konfiguration")
+                                .font(.title2.weight(.bold))
                                 .foregroundStyle(AppColorsPremium.textPrimary)
 
-                            Picker("Server", selection: $activeServerRaw) {
-                                ForEach(ServerKind.allCases) { kind in
-                                    Text(kind.label).tag(kind.rawValue)
+                            Text("Wähle deinen aktiven Server und trage die Adressen ein.")
+                                .font(.subheadline)
+                                .foregroundStyle(AppColorsPremium.textSecondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                        // MARK: - Server Auswahl
+                        VStack(alignment: .leading, spacing: AppThemePremium.md) {
+                            sectionLabel("Aktiver Server")
+
+                            PremiumGlassCard {
+                                VStack(alignment: .leading, spacing: AppThemePremium.md) {
+                                    Picker("Server", selection: $activeServerRaw) {
+                                        ForEach(ServerKind.allCases) { kind in
+                                            Text(kind.label).tag(kind.rawValue)
+                                        }
+                                    }
+                                    .pickerStyle(.segmented)
+                                    .tint(AppColorsPremium.accentBlue)
+
+                                    if let server = activeServer {
+                                        HStack(spacing: AppThemePremium.md) {
+                                            Image(systemName: "info.circle.fill")
+                                                .foregroundStyle(AppColorsPremium.accentTeal)
+                                                .font(.subheadline)
+
+                                            Text(server.settingsHint)
+                                                .font(.caption)
+                                                .foregroundStyle(AppColorsPremium.textSecondary)
+                                                .fixedSize(horizontal: false, vertical: true)
+                                        }
+                                        .padding(AppThemePremium.md)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .background(AppColorsPremium.auroraTeal.opacity(0.06))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: AppThemePremium.radiusSmall)
+                                                .stroke(AppColorsPremium.accentTeal.opacity(0.25), lineWidth: 1)
+                                        )
+                                        .cornerRadius(AppThemePremium.radiusSmall)
+                                    }
                                 }
                             }
-                            .pickerStyle(.segmented)
-                            .tint(AppColorsPremium.accentBlue)
+                        }
 
-                            if let activeServer = ServerKind(rawValue: activeServerRaw) {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(activeServer.label)
-                                        .font(.subheadline.weight(.semibold))
-                                        .foregroundStyle(AppColorsPremium.accentBlue)
-                                    Text(activeServer.settingsHint)
+                        // MARK: - Cloud Server
+                        VStack(alignment: .leading, spacing: AppThemePremium.md) {
+                            sectionLabel("Cloud-Server")
+
+                            PremiumGlassCard {
+                                VStack(alignment: .leading, spacing: AppThemePremium.md) {
+                                    HStack(spacing: AppThemePremium.sm) {
+                                        Image(systemName: "cloud.fill")
+                                            .foregroundStyle(AppColorsPremium.accentBlue)
+                                        Text("VidSave")
+                                            .font(.headline.weight(.semibold))
+                                            .foregroundStyle(AppColorsPremium.textPrimary)
+
+                                        Spacer()
+
+                                        if activeServerRaw == ServerKind.vidSave.rawValue {
+                                            activeBadge
+                                        }
+                                    }
+
+                                    PremiumGlassInputField(
+                                        placeholder: "http://158.101.168.11:8765",
+                                        text: $cloudServerURL,
+                                        icon: cloudServerURL.isEmpty ? "exclamationmark.circle" : "checkmark.circle.fill",
+                                        onIconTap: {}
+                                    )
+
+                                    Text("Überall erreichbar, kein Mac nötig. Für YouTube und viele Plattformen oft unzuverlässig.")
                                         .font(.caption)
                                         .foregroundStyle(AppColorsPremium.textSecondary)
                                 }
-                                .padding(AppThemePremium.md)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(AppColorsPremium.glassSurface)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: AppThemePremium.radiusSmall)
-                                        .stroke(AppColorsPremium.glassBorder, lineWidth: 0.8)
-                                )
-                                .cornerRadius(AppThemePremium.radiusSmall)
                             }
                         }
+
+                        // MARK: - Mac Server
+                        VStack(alignment: .leading, spacing: AppThemePremium.md) {
+                            sectionLabel("Mac-Server")
+
+                            PremiumGlassCard {
+                                VStack(alignment: .leading, spacing: AppThemePremium.md) {
+                                    HStack(spacing: AppThemePremium.sm) {
+                                        Image(systemName: "desktopcomputer")
+                                            .foregroundStyle(AppColorsPremium.accentViolet)
+                                        Text("VideoLoader (lokal)")
+                                            .font(.headline.weight(.semibold))
+                                            .foregroundStyle(AppColorsPremium.textPrimary)
+
+                                        Spacer()
+
+                                        if activeServerRaw == ServerKind.videoLoader.rawValue {
+                                            activeBadge
+                                        }
+                                    }
+
+                                    PremiumGlassInputField(
+                                        placeholder: "http://192.168.1.23:8000",
+                                        text: $macServerURL,
+                                        icon: macServerURL.isEmpty ? "exclamationmark.circle" : "checkmark.circle.fill",
+                                        onIconTap: {}
+                                    )
+
+                                    Text("Starte `start.sh` auf dem Mac, trage die IP-Adresse ein. Im gleichen WLAN die zuverlässigste Option.")
+                                        .font(.caption)
+                                        .foregroundStyle(AppColorsPremium.textSecondary)
+                                }
+                            }
+                        }
+
+                        Spacer(minHeight: AppThemePremium.xxl)
                     }
-
-                    serverCard(
-                        title: "Cloud-Server (VidSave)",
-                        text: $cloudServerURL,
-                        placeholder: "http://158.101.168.11:8765",
-                        helperText: "Überall erreichbar, kein Mac nötig. Für YouTube und viele große Plattformen aber oft unzuverlässig."
-                    )
-
-                    serverCard(
-                        title: "Mac-Server (VideoLoader)",
-                        text: $macServerURL,
-                        placeholder: "http://192.168.1.23:8000",
-                        helperText: "Starte auf dem Mac `start.sh`. Die angezeigte Adresse hier eintragen. Im gleichen WLAN ist dieser Server die zuverlässigste Wahl."
-                    )
+                    .padding(AppThemePremium.screenPadding)
                 }
             }
-            .padding(AppThemePremium.screenPadding)
-            .background(PremiumAuroraBackground())
             .navigationTitle("Einstellungen")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Fertig") { dismiss() }
+                        .font(.body.weight(.semibold))
                         .foregroundStyle(AppColorsPremium.accentBlue)
                 }
             }
         }
     }
 
-    private func serverCard(
-        title: String,
-        text: Binding<String>,
-        placeholder: String,
-        helperText: String
-    ) -> some View {
-        PremiumGlassCard {
-            VStack(alignment: .leading, spacing: AppThemePremium.md) {
-                Text(title)
-                    .font(.headline)
-                    .foregroundStyle(AppColorsPremium.textPrimary)
+    // MARK: - Helper Views
 
-                PremiumGlassInputField(
-                    placeholder: placeholder,
-                    text: text,
-                    icon: "server.rack",
-                    onIconTap: {}
-                )
-                Text(helperText)
-                    .font(.caption)
-                    .foregroundStyle(AppColorsPremium.textSecondary)
+    private func sectionLabel(_ text: String) -> some View {
+        Text(text.uppercased())
+            .font(.caption.weight(.semibold))
+            .tracking(1.2)
+            .foregroundStyle(AppColorsPremium.textTertiary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.leading, 4)
+    }
 
-            }
-        }
+    private var activeBadge: some View {
+        Text("AKTIV")
+            .font(.caption2.weight(.bold))
+            .tracking(0.8)
+            .foregroundStyle(AppColorsPremium.accentBlue)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(AppColorsPremium.accentBlue.opacity(0.15))
+            .overlay(
+                Capsule()
+                    .stroke(AppColorsPremium.accentBlue.opacity(0.4), lineWidth: 1)
+            )
+            .clipShape(Capsule())
     }
 }
 
