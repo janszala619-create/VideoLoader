@@ -72,7 +72,7 @@ struct GlassInputField<Accessory: View>: View {
 }
 
 extension GlassInputField where Accessory == EmptyView {
-    /// Bequemer Initialisierer, wenn kein Zusatzelement neben dem Textfeld gebraucht wird.
+    /// Bequemer Initialisierer, wenn neben dem Textfeld kein Zusatzelement gebraucht wird.
     init(
         label: String,
         placeholder: String,

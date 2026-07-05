@@ -61,7 +61,7 @@ struct LibraryView: View {
     var body: some View {
         NavigationStack {
             mainContent
-                .background(glassBackground.ignoresSafeArea())
+            .background(glassBackground.ignoresSafeArea())
             .navigationTitle("Meine Videos")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
@@ -125,9 +125,8 @@ struct LibraryView: View {
         }
     }
 
-    /// In eine eigene Sub-View ausgelagert, weil der Compiler die tief
-    /// verschachtelte if/else-Struktur sonst nicht in vernünftiger Zeit
-    /// typprüfen konnte ("unable to type-check this expression").
+    /// In eine eigene Sub-View ausgelagert, weil die verschachtelte if/else-
+    /// Struktur sonst den Compiler unnötig belastet.
     @ViewBuilder
     private var mainContent: some View {
         if videos.isEmpty {
@@ -152,7 +151,6 @@ struct LibraryView: View {
     private var emptySearchMessage: String {
         "Für „\(searchText)“ wurde kein gespeichertes Video gefunden."
     }
-
     private var videoList: some View {
         List {
             Section {
