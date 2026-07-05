@@ -3,10 +3,13 @@ import AVKit
 
 struct ContentView: View {
     @Binding var pendingLink: String?
+    @Environment(\.scenePhase) private var scenePhase
 
     @AppStorage("serverURL_videoLoader") private var macServerURL = ""
     @AppStorage("serverURL_vidSave") private var cloudServerURL = "http://158.101.168.11:8765"
     @AppStorage("activeServer") private var activeServerRaw = ServerKind.vidSave.rawValue
+
+    @State private var clipboardHasLink = false
 
     @State private var videoLink = ""
     @State private var info: VideoInfo?
@@ -93,9 +96,15 @@ struct ContentView: View {
                 if activeBaseURL.isEmpty { showSettings = true }
                 Task { await checkServer() }
                 consumePendingLink()
+                detectClipboardLink()
             }
             .onChange(of: pendingLink) { _, _ in
                 consumePendingLink()
+            }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active {
+                    detectClipboardLink()
+                }
             }
         }
     }
@@ -194,6 +203,31 @@ struct ContentView: View {
                 Label("Video prüfen", systemImage: "magnifyingglass")
             }
             .disabled(cleanedLink.isEmpty || isLoadingInfo)
+
+            if clipboardHasLink && videoLink.isEmpty {
+                Button {
+                    if let pasted = UIPasteboard.general.string {
+                        videoLink = pasted
+                        clipboardHasLink = false
+                        Task { await loadInfo() }
+                    }
+                } label: {
+                    Label("Link aus Zwischenablage übernehmen", systemImage: "link.badge.plus")
+                        .foregroundStyle(Theme.tint)
+                }
+            }
+        }
+    }
+
+    /// Prüft ohne System-Popup, ob ein Web-Link in der Zwischenablage liegt.
+    private func detectClipboardLink() {
+        guard cleanedLink.isEmpty, info == nil else { return }
+        UIPasteboard.general.detectPatterns(for: [\.probableWebURL]) { result in
+            DispatchQueue.main.async {
+                if case .success(let patterns) = result, patterns.contains(\.probableWebURL) {
+                    clipboardHasLink = true
+                }
+            }
         }
     }
 
