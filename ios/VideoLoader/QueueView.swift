@@ -292,6 +292,47 @@ struct QueueView: View {
     }
 }
 
+private struct QueueStatusBadge: View {
+    let job: DownloadJob
+
+    private var tone: (color: Color, title: String, systemImage: String) {
+        switch job.status {
+        case .waiting:
+            return (AppColors.info, "Wartet", "clock.fill")
+        case .running:
+            return (AppColors.accentPrimary, "Lädt", "arrow.down.circle.fill")
+        case .done:
+            return (AppColors.success, "Fertig", "checkmark.circle.fill")
+        case .failed:
+            return (AppColors.error, "Fehler", "xmark.octagon.fill")
+        }
+    }
+
+    var body: some View {
+        Label {
+            Text(tone.title)
+                .font(AppTypography.caption.weight(.semibold))
+        } icon: {
+            Image(systemName: tone.systemImage)
+        }
+        .labelStyle(.titleAndIcon)
+        .font(AppTypography.caption.weight(.semibold))
+        .foregroundStyle(tone.color)
+        .padding(.horizontal, AppSpacing.sm)
+        .padding(.vertical, AppSpacing.xs)
+        .background(
+            Capsule(style: .continuous)
+                .fill(tone.color.opacity(0.14))
+        )
+        .overlay(
+            Capsule(style: .continuous)
+                .stroke(tone.color.opacity(0.22), lineWidth: 1)
+        )
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Status \(tone.title) für \(job.title)")
+    }
+}
+
 private struct QueueMetricChip: View {
     let title: String
     let value: String
