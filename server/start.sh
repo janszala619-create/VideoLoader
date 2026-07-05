@@ -39,6 +39,15 @@ if [ "$TODAY" != "$LAST_YTDLP_UPDATE" ]; then
   echo "$TODAY" > "$YTDLP_STAMP"
 fi
 
+# aria2c beschleunigt Downloads durch mehrere parallele Verbindungen –
+# optional, wird automatisch genutzt, falls vorhanden.
+if ! command -v aria2c >/dev/null 2>&1; then
+  if command -v brew >/dev/null 2>&1; then
+    echo "Installiere aria2 für schnellere Downloads (einmalig) ..."
+    brew install aria2 >/dev/null 2>&1 || echo "Hinweis: aria2 konnte nicht automatisch installiert werden (optional, kein Problem)."
+  fi
+fi
+
 echo ""
 echo "Server startet. Diese Adresse in der App eintragen:"
 IP=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null)

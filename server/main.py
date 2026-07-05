@@ -136,6 +136,9 @@ def _format_selector(quality: int | None) -> str:
     return f"best{h}[ext=mp4]/best{h}/bestvideo{h}+bestaudio/best"
 
 
+_ARIA2C_PATH = shutil.which("aria2c")
+
+
 def _download_options(url: str, tmpdir: str, format_selector: str) -> dict:
     opts = _base_ydl_options(url)
     opts.update({
@@ -144,11 +147,22 @@ def _download_options(url: str, tmpdir: str, format_selector: str) -> dict:
         "merge_output_format": "mp4",
         "retries": 5,
         "fragment_retries": 5,
-        "concurrent_fragment_downloads": 8,
+        # Bei in Häppchen aufgeteilten Quellen (HLS/DASH) so viele Stücke
+        # gleichzeitig laden wie sinnvoll möglich.
+        "concurrent_fragment_downloads": 16,
         "extractor_retries": 3,
         "file_access_retries": 3,
         "socket_timeout": 30,
     })
+    if _ARIA2C_PATH:
+        # Für normale (nicht fragmentierte) Downloads nutzt aria2c mehrere
+        # parallele Verbindungen zur Quelle statt nur einer – oft der größte
+        # Geschwindigkeitsgewinn. Wird automatisch übersprungen, falls
+        # aria2c auf diesem Server nicht installiert ist.
+        opts["external_downloader"] = "aria2c"
+        opts["external_downloader_args"] = {
+            "aria2c": ["-x", "16", "-s", "16", "-k", "1M", "--summary-interval=0"]
+        }
     return opts
 
 

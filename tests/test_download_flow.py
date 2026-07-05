@@ -107,7 +107,7 @@ class DownloadFlowTests(unittest.TestCase):
     def test_fragment_downloads_are_parallelized_for_hls_fallbacks(self):
         main.api_download("https://example.test/watch/1", quality=1080)
 
-        self.assertEqual(FakeYoutubeDL.calls[0]["concurrent_fragment_downloads"], 8)
+        self.assertEqual(FakeYoutubeDL.calls[0]["concurrent_fragment_downloads"], 16)
 
     def test_download_after_info_extracts_again_without_reusing_cdn_url(self):
         info = main.api_info("https://example.test/watch/1")
