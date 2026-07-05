@@ -13,8 +13,9 @@ struct ContentView: View {
     @State private var errorMessage: String?
     @State private var showSettings = false
     @State private var showPreviewPlayer = false
+    @State private var justQueuedTitle: String?
 
-    @StateObject private var downloader = DownloadManager()
+    @ObservedObject private var queue = DownloadQueue.shared
 
     private var activeServer: ServerKind {
         ServerKind(rawValue: activeServerRaw) ?? .vidSave
@@ -42,6 +43,13 @@ struct ContentView: View {
                                 .foregroundStyle(.secondary)
                                 .padding(.leading, 8)
                         }
+                    }
+                }
+
+                if let justQueuedTitle {
+                    Section {
+                        Label("„\(justQueuedTitle)“ ist in der Warteschlange. Den Fortschritt siehst du im Tab „Downloads“.", systemImage: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
                     }
                 }
 
@@ -94,7 +102,6 @@ struct ContentView: View {
             .pickerStyle(.segmented)
             .onChange(of: activeServerRaw) { _, _ in
                 info = nil
-                downloader.reset()
             }
         }
     }
@@ -120,7 +127,6 @@ struct ContentView: View {
                     Button {
                         videoLink = ""
                         info = nil
-                        downloader.reset()
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundStyle(.secondary)
@@ -200,59 +206,15 @@ struct ContentView: View {
     @ViewBuilder
     private var downloadSection: some View {
         Section("Download") {
-            switch downloader.phase {
-            case .idle:
-                downloadButton
-            case .waitingForServer:
-                HStack {
-                    ProgressView()
-                    Text("Server lädt das Video von der Plattform …")
-                        .foregroundStyle(.secondary)
-                        .padding(.leading, 8)
-                }
-                cancelButton
-            case .downloading(let progress):
-                if let progress {
-                    ProgressView(value: progress) {
-                        Text("Wird aufs iPhone geladen … \(Int(progress * 100)) %")
-                    }
-                } else {
-                    HStack {
-                        ProgressView()
-                        Text("Wird aufs iPhone geladen …")
-                            .foregroundStyle(.secondary)
-                            .padding(.leading, 8)
-                    }
-                }
-                cancelButton
-            case .done:
-                Label("Fertig! Das Video liegt jetzt im Tab „Meine Videos“ – dort kannst du es ansehen, teilen oder in die Fotos-Galerie sichern.", systemImage: "checkmark.circle.fill")
-                    .foregroundStyle(.green)
-                Button("Neues Video laden") {
-                    videoLink = ""
-                    info = nil
-                    downloader.reset()
-                }
-            case .failed(let message):
-                Label(message, systemImage: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.red)
-                downloadButton
+            Button {
+                enqueueDownload()
+            } label: {
+                Label("Zur Warteschlange hinzufügen", systemImage: "arrow.down.circle.fill")
+                    .fontWeight(.semibold)
             }
-        }
-    }
-
-    private var downloadButton: some View {
-        Button {
-            startDownload()
-        } label: {
-            Label("Herunterladen", systemImage: "arrow.down.circle.fill")
-                .fontWeight(.semibold)
-        }
-    }
-
-    private var cancelButton: some View {
-        Button("Abbrechen", role: .destructive) {
-            downloader.cancel()
+            Text("Der Download läuft im Hintergrund weiter – auch wenn du die App schließt oder das iPhone sperrst.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
         }
     }
 
@@ -279,7 +241,7 @@ struct ContentView: View {
 
     private func loadInfo() async {
         info = nil
-        downloader.reset()
+        justQueuedTitle = nil
         isLoadingInfo = true
         defer { isLoadingInfo = false }
         do {
@@ -294,16 +256,22 @@ struct ContentView: View {
         }
     }
 
-    private func startDownload() {
+    private func enqueueDownload() {
         do {
             let api = ServerAPI(kind: activeServer, baseURL: activeBaseURL)
             let url = try api.downloadURL(for: cleanedLink, quality: selectedQuality)
             let fallback = try? api.downloadURL(for: cleanedLink, quality: nil)
-            downloader.start(
-                url: url,
-                fallbackURL: fallback == url ? nil : fallback,
-                title: info?.title ?? "Video"
+            let title = info?.title ?? "Video"
+            queue.enqueue(
+                title: title,
+                sourceLink: cleanedLink,
+                primaryURL: url,
+                fallbackURL: fallback == url ? nil : fallback
             )
+            // Formular für das nächste Video freimachen
+            justQueuedTitle = title
+            videoLink = ""
+            info = nil
         } catch let error as APIError {
             errorMessage = error.errorDescription
         } catch {

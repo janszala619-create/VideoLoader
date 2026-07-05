@@ -7,6 +7,12 @@ struct LibraryView: View {
     @State private var videos: [DownloadedVideo] = []
     @State private var selectedVideo: DownloadedVideo?
     @State private var feedback: String?
+    @ObservedObject private var queue = DownloadQueue.shared
+
+    /// Zahl der fertigen Downloads – ändert sie sich, wurde ein neues Video abgelegt.
+    private var doneCount: Int {
+        queue.jobs.filter { $0.status == .done }.count
+    }
 
     var body: some View {
         NavigationStack {
@@ -28,6 +34,7 @@ struct LibraryView: View {
             }
             .navigationTitle("Meine Videos")
             .onAppear(perform: reload)
+            .onChange(of: doneCount) { _, _ in reload() }
             .sheet(item: $selectedVideo) { video in
                 VideoPlayer(player: AVPlayer(url: video.url))
                     .ignoresSafeArea()
