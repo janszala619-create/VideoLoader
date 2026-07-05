@@ -4,14 +4,22 @@ import SwiftUI
 struct QueueView: View {
     @ObservedObject private var queue = DownloadQueue.shared
 
+    private var glassBackground: some View {
+        LinearGradient(
+            colors: [AppGlassColors.bgElevated, AppGlassColors.bgBase, AppGlassColors.bgDeep],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+    }
+
     var body: some View {
         NavigationStack {
             Group {
                 if queue.jobs.isEmpty {
-                    ContentUnavailableView(
-                        "Keine Downloads",
-                        systemImage: "arrow.down.circle",
-                        description: Text("Füge im Tab „Laden“ ein Video hinzu. Mehrere Videos werden nacheinander abgearbeitet – auch wenn die App geschlossen ist.")
+                    GlassEmptyStateView(
+                        title: "Keine Downloads",
+                        message: "Füge im Tab „Laden“ ein Video hinzu. Mehrere Videos werden nacheinander abgearbeitet – auch wenn die App geschlossen ist.",
+                        systemImage: "arrow.down.circle"
                     )
                 } else {
                     List {
@@ -20,15 +28,16 @@ struct QueueView: View {
                         }
                     }
                     .scrollContentBackground(.hidden)
-                    .listRowBackground(Theme.card)
                 }
             }
-            .background(Theme.background.ignoresSafeArea())
+            .background(glassBackground.ignoresSafeArea())
             .navigationTitle("Downloads")
+            .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 if queue.jobs.contains(where: { $0.status == .done || $0.status == .failed }) {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button("Aufräumen") { queue.clearFinished() }
+                            .foregroundStyle(AppGlassColors.textPrimary)
                     }
                 }
             }
@@ -36,52 +45,26 @@ struct QueueView: View {
     }
 
     private func row(_ job: DownloadJob) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 10) {
+        GlassCard {
+            HStack(alignment: .top, spacing: AppGlassSpacing.md) {
                 statusIcon(job)
-                Text(job.title)
-                    .font(.subheadline)
-                    .lineLimit(2)
+                    .font(.headline)
+                VStack(alignment: .leading, spacing: AppGlassSpacing.xs) {
+                    Text(job.title)
+                        .font(AppGlassTypography.headline)
+                        .foregroundStyle(AppGlassColors.textPrimary)
+                        .lineLimit(2)
+                    Text(statusHeadline(job))
+                        .font(AppGlassTypography.subheadline)
+                        .foregroundStyle(AppGlassColors.textSecondary)
+                }
                 Spacer()
             }
 
-            switch job.status {
-            case .waiting:
-                Text("Wartet …")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            case .running:
-                if job.progress > 0 {
-                    ProgressView(value: job.progress)
-                    Text("\(Int(job.progress * 100)) %")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } else {
-                    HStack(spacing: 8) {
-                        ProgressView()
-                        Text("Server bereitet das Video vor …")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            case .done:
-                Text("Fertig – liegt in „Meine Videos“")
-                    .font(.caption)
-                    .foregroundStyle(.green)
-            case .failed:
-                Text(job.message ?? "Fehlgeschlagen")
-                    .font(.caption)
-                    .foregroundStyle(.red)
-                Button {
-                    queue.retry(job)
-                } label: {
-                    Label("Erneut versuchen", systemImage: "arrow.clockwise")
-                        .font(.caption)
-                }
-                .buttonStyle(.borderless)
-            }
+            detailContent(job)
         }
-        .padding(.vertical, 4)
+        .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
+        .listRowBackground(Color.clear)
         .swipeActions(edge: .trailing) {
             Button(role: .destructive) {
                 queue.remove(job)
@@ -93,16 +76,63 @@ struct QueueView: View {
     }
 
     @ViewBuilder
+    private func detailContent(_ job: DownloadJob) -> some View {
+        switch job.status {
+        case .waiting:
+            Text("Der Download startet automatisch, sobald vorherige Aufträge abgeschlossen sind.")
+                .font(AppGlassTypography.footnote)
+                .foregroundStyle(AppGlassColors.textSecondary)
+        case .running:
+            if job.progress > 0 {
+                ProgressView(value: job.progress)
+                    .tint(AppGlassColors.accentPrimary)
+                Text("\(Int(job.progress * 100)) % heruntergeladen")
+                    .font(AppGlassTypography.footnote)
+                    .foregroundStyle(AppGlassColors.textSecondary)
+            } else {
+                HStack(spacing: AppGlassSpacing.sm) {
+                    ProgressView()
+                        .tint(AppGlassColors.accentPrimary)
+                    Text("Der Server bereitet die Datei vor.")
+                        .font(AppGlassTypography.footnote)
+                        .foregroundStyle(AppGlassColors.textSecondary)
+                }
+            }
+        case .done:
+            Text("Das Video liegt jetzt in „Meine Videos“ und kann dort abgespielt oder geteilt werden.")
+                .font(AppGlassTypography.footnote)
+                .foregroundStyle(AppGlassColors.success)
+        case .failed:
+            GlassStatusBanner(
+                tone: .error,
+                title: "Download fehlgeschlagen",
+                message: job.message ?? "Bitte versuche es erneut.",
+                actionTitle: "Erneut versuchen",
+                action: { queue.retry(job) }
+            )
+        }
+    }
+
+    @ViewBuilder
     private func statusIcon(_ job: DownloadJob) -> some View {
         switch job.status {
         case .waiting:
-            Image(systemName: "clock").foregroundStyle(.secondary)
+            Image(systemName: "clock").foregroundStyle(AppGlassColors.textTertiary)
         case .running:
-            Image(systemName: "arrow.down.circle").foregroundStyle(.blue)
+            Image(systemName: "arrow.down.circle.fill").foregroundStyle(AppGlassColors.accentPrimary)
         case .done:
-            Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+            Image(systemName: "checkmark.circle.fill").foregroundStyle(AppGlassColors.success)
         case .failed:
-            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.red)
+            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(AppGlassColors.error)
+        }
+    }
+
+    private func statusHeadline(_ job: DownloadJob) -> String {
+        switch job.status {
+        case .waiting: return "Wartet auf freien Platz in der Warteschlange"
+        case .running: return "Wird gerade geladen"
+        case .done: return "Abgeschlossen"
+        case .failed: return "Aktion erforderlich"
         }
     }
 }

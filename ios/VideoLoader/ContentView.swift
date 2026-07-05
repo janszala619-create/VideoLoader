@@ -35,27 +35,53 @@ struct ContentView: View {
         videoLink.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    private var glassBackground: some View {
+        LinearGradient(
+            colors: [AppGlassColors.bgElevated, AppGlassColors.bgBase, AppGlassColors.bgDeep],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+    }
+
     var body: some View {
         NavigationStack {
             Form {
                 serverSection
                 linkSection
 
+                if let errorMessage {
+                    Section {
+                        GlassErrorStateView(
+                            title: "Aktion fehlgeschlagen",
+                            message: errorMessage,
+                            actionTitle: "Einstellungen öffnen",
+                            action: { showSettings = true }
+                        )
+                        .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
+                        .listRowBackground(Color.clear)
+                    }
+                }
+
                 if isLoadingInfo {
                     Section {
-                        HStack {
-                            ProgressView()
-                            Text("Video wird geprüft …")
-                                .foregroundStyle(.secondary)
-                                .padding(.leading, 8)
-                        }
+                        GlassLoadingStateView(
+                            title: "Video wird geprüft",
+                            message: "Metadaten und verfügbare Qualitäten werden geladen."
+                        )
+                        .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
+                        .listRowBackground(Color.clear)
                     }
                 }
 
                 if let justQueuedTitle {
                     Section {
-                        Label("„\(justQueuedTitle)“ ist in der Warteschlange. Den Fortschritt siehst du im Tab „Downloads“.", systemImage: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
+                        GlassStatusBanner(
+                            tone: .success,
+                            title: "Zur Warteschlange hinzugefügt",
+                            message: "„\(justQueuedTitle)“ wird jetzt im Tab „Downloads“ weiterverarbeitet."
+                        )
+                        .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
+                        .listRowBackground(Color.clear)
                     }
                 }
 
@@ -65,16 +91,19 @@ struct ContentView: View {
                     downloadSection
                 }
             }
-            .neonScreenBackground()
-            .neonCardRow()
+            .scrollContentBackground(.hidden)
+            .background(glassBackground.ignoresSafeArea())
             .navigationTitle("VideoLoader")
+            .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         showSettings = true
                     } label: {
                         Image(systemName: "gearshape")
+                            .foregroundStyle(AppGlassColors.textPrimary)
                     }
+                    .accessibilityLabel("Einstellungen öffnen")
                 }
             }
             .sheet(isPresented: $showSettings) {
@@ -86,11 +115,6 @@ struct ContentView: View {
             }
             .sheet(isPresented: $showPreviewPlayer) {
                 previewPlayerSheet
-            }
-            .alert("Fehler", isPresented: errorAlertBinding) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(errorMessage ?? "")
             }
             .onAppear {
                 if activeBaseURL.isEmpty { showSettings = true }
@@ -121,41 +145,44 @@ struct ContentView: View {
             .pickerStyle(.segmented)
             .onChange(of: activeServerRaw) { _, _ in
                 info = nil
+                errorMessage = nil
                 Task { await checkServer() }
             }
+            .tint(AppGlassColors.accentPrimary)
 
-            HStack(spacing: 8) {
-                Circle()
-                    .fill(serverStatusColor)
-                    .frame(width: 10, height: 10)
-                Text(serverStatusText)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Button {
-                    Task { await checkServer() }
-                } label: {
-                    Image(systemName: "arrow.clockwise")
-                        .font(.footnote)
-                }
-                .buttonStyle(.borderless)
-            }
+            GlassStatusBanner(
+                tone: serverStatusTone,
+                title: serverStatusTitle,
+                message: serverStatusText,
+                actionTitle: "Erneut prüfen",
+                action: { Task { await checkServer() } }
+            )
+            .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
+            .listRowBackground(Color.clear)
         }
     }
 
-    private var serverStatusColor: Color {
+    private var serverStatusTone: GlassStatusTone {
         switch serverOnline {
-        case .some(true): return .green
-        case .some(false): return .red
-        case .none: return .gray
+        case .some(true): return .success
+        case .some(false): return .warning
+        case .none: return .neutral
+        }
+    }
+
+    private var serverStatusTitle: String {
+        switch serverOnline {
+        case .some(true): return "Server erreichbar"
+        case .some(false): return "Server braucht Aufmerksamkeit"
+        case .none: return "Serverstatus wird geprüft"
         }
     }
 
     private var serverStatusText: String {
         switch serverOnline {
-        case .some(true): return "Server erreichbar"
-        case .some(false): return "Server nicht erreichbar – Adresse in den Einstellungen prüfen"
-        case .none: return "Server wird geprüft …"
+        case .some(true): return "Der aktive Server antwortet und ist bereit für die Video-Prüfung."
+        case .some(false): return "Adresse oder Erreichbarkeit prüfen. Falls nötig, den Server in den Einstellungen anpassen."
+        case .none: return "Die Verbindung zum aktuell ausgewählten Server wird gerade getestet."
         }
     }
 
@@ -171,50 +198,68 @@ struct ContentView: View {
 
     private var linkSection: some View {
         Section("Video-Link") {
-            HStack {
-                TextField("Link hier einfügen", text: $videoLink)
-                    .keyboardType(.URL)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-
+            GlassInputField(
+                label: "Link",
+                placeholder: "Link hier einfügen",
+                text: $videoLink,
+                helperText: "Füge einen direkten Video-Link ein oder übernimm einen erkannten Link aus der Zwischenablage.",
+                keyboardType: .URL,
+                textContentType: .URL,
+                autocapitalization: .never,
+                disablesAutocorrection: true
+            ) {
                 if videoLink.isEmpty {
                     Button {
                         if let pasted = UIPasteboard.general.string {
                             videoLink = pasted
+                            errorMessage = nil
                             Task { await loadInfo() }
                         }
                     } label: {
                         Image(systemName: "doc.on.clipboard")
+                            .foregroundStyle(AppGlassColors.textSecondary)
                     }
+                    .frame(minWidth: AppGlassTheme.controlHeight, minHeight: AppGlassTheme.controlHeight)
+                    .accessibilityLabel("Link aus Zwischenablage einfügen")
                 } else {
                     Button {
                         videoLink = ""
                         info = nil
+                        errorMessage = nil
                     } label: {
                         Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(AppGlassColors.textSecondary)
                     }
+                    .frame(minWidth: AppGlassTheme.controlHeight, minHeight: AppGlassTheme.controlHeight)
+                    .accessibilityLabel("Linkfeld leeren")
                 }
             }
+            .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
+            .listRowBackground(Color.clear)
 
             Button {
                 Task { await loadInfo() }
             } label: {
                 Label("Video prüfen", systemImage: "magnifyingglass")
             }
+            .buttonStyle(GlassSecondaryButtonStyle())
             .disabled(cleanedLink.isEmpty || isLoadingInfo)
+            .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
+            .listRowBackground(Color.clear)
 
             if clipboardHasLink && videoLink.isEmpty {
                 Button {
                     if let pasted = UIPasteboard.general.string {
                         videoLink = pasted
                         clipboardHasLink = false
+                        errorMessage = nil
                         Task { await loadInfo() }
                     }
                 } label: {
                     Label("Link aus Zwischenablage übernehmen", systemImage: "link.badge.plus")
-                        .foregroundStyle(Theme.tint)
                 }
+                .buttonStyle(.borderless)
+                .foregroundStyle(AppGlassColors.accentSecondary)
             }
         }
     }
@@ -233,17 +278,17 @@ struct ContentView: View {
 
     private func previewSection(_ info: VideoInfo) -> some View {
         Section("Vorschau") {
-            VStack(alignment: .leading, spacing: 12) {
+            GlassCard {
                 ZStack {
                     AsyncImage(url: info.thumbnailURL) { image in
                         image.resizable().aspectRatio(contentMode: .fit)
                     } placeholder: {
                         Rectangle()
-                            .fill(Color.secondary.opacity(0.2))
+                            .fill(AppGlassColors.glassSurfaceStrong)
                             .aspectRatio(16 / 9, contentMode: .fit)
-                            .overlay { Image(systemName: "film").font(.largeTitle).foregroundStyle(.secondary) }
+                            .overlay { Image(systemName: "film").font(.largeTitle).foregroundStyle(AppGlassColors.textTertiary) }
                     }
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .clipShape(RoundedRectangle(cornerRadius: AppGlassTheme.radiusLarge))
 
                     if info.previewURL != nil {
                         Button {
@@ -252,13 +297,15 @@ struct ContentView: View {
                             Image(systemName: "play.circle.fill")
                                 .font(.system(size: 56))
                                 .foregroundStyle(.white)
-                                .shadow(radius: 6)
+                                .shadow(color: AppGlassColors.accentGlow, radius: 18, x: 0, y: 6)
                         }
+                        .accessibilityLabel("Videovorschau abspielen")
                     }
                 }
 
                 Text(info.title)
-                    .font(.headline)
+                    .font(AppGlassTypography.title3)
+                    .foregroundStyle(AppGlassColors.textPrimary)
 
                 HStack(spacing: 12) {
                     if let uploader = info.uploader {
@@ -268,26 +315,37 @@ struct ContentView: View {
                         Label(duration, systemImage: "clock")
                     }
                 }
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .font(AppGlassTypography.subheadline)
+                .foregroundStyle(AppGlassColors.textSecondary)
             }
-            .padding(.vertical, 4)
+            .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
+            .listRowBackground(Color.clear)
         }
     }
 
     private func qualitySection(_ info: VideoInfo) -> some View {
         Section("Qualität") {
-            if info.qualities.isEmpty {
-                Text("Beste verfügbare Qualität")
-                    .foregroundStyle(.secondary)
-            } else {
-                Picker("Auflösung", selection: $selectedQuality) {
-                    ForEach(info.qualities) { quality in
-                        Text(quality.label).tag(Optional(quality))
+            GlassCard {
+                if info.qualities.isEmpty {
+                    Text("Beste verfügbare Qualität")
+                        .font(AppGlassTypography.body)
+                        .foregroundStyle(AppGlassColors.textSecondary)
+                } else {
+                    Picker("Auflösung", selection: $selectedQuality) {
+                        ForEach(info.qualities) { quality in
+                            Text(quality.label).tag(Optional(quality))
+                        }
                     }
+                    .pickerStyle(.menu)
+                    .tint(AppGlassColors.accentSecondary)
+
+                    Text("Wenn eine Auswahl fehlschlägt, versucht die App automatisch eine kompatible Variante.")
+                        .font(AppGlassTypography.footnote)
+                        .foregroundStyle(AppGlassColors.textSecondary)
                 }
-                .pickerStyle(.menu)
             }
+            .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
+            .listRowBackground(Color.clear)
         }
     }
 
@@ -299,13 +357,13 @@ struct ContentView: View {
             } label: {
                 Label("Zur Warteschlange hinzufügen", systemImage: "arrow.down.circle.fill")
             }
-            .buttonStyle(GlowButtonStyle())
-            .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
+            .buttonStyle(GlassPrimaryButtonStyle())
+            .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
             .listRowBackground(Color.clear)
 
             Text("Der Download läuft im Hintergrund weiter – auch wenn du die App schließt oder das iPhone sperrst.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+                .font(AppGlassTypography.footnote)
+                .foregroundStyle(AppGlassColors.textSecondary)
         }
     }
 
@@ -323,25 +381,20 @@ struct ContentView: View {
 
     // MARK: - Aktionen
 
-    private var errorAlertBinding: Binding<Bool> {
-        Binding(
-            get: { errorMessage != nil },
-            set: { if !$0 { errorMessage = nil } }
-        )
-    }
-
     /// Übernimmt einen per Teilen-Menü empfangenen Link und prüft ihn direkt.
     private func consumePendingLink() {
         guard let link = pendingLink, !link.isEmpty else { return }
         pendingLink = nil
         videoLink = link
         justQueuedTitle = nil
+        errorMessage = nil
         Task { await loadInfo() }
     }
 
     private func loadInfo() async {
         info = nil
         justQueuedTitle = nil
+        errorMessage = nil
         isLoadingInfo = true
         defer { isLoadingInfo = false }
         do {
@@ -372,6 +425,7 @@ struct ContentView: View {
             justQueuedTitle = title
             videoLink = ""
             info = nil
+            errorMessage = nil
         } catch let error as APIError {
             errorMessage = error.errorDescription
         } catch {
