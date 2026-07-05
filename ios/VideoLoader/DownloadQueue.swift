@@ -134,7 +134,7 @@ final class DownloadQueue: NSObject, ObservableObject {
         task.resume()
     }
 
-    private func updateJob(_ id: UUID, _ change: (inout DownloadJob) -> Void) {
+    private func updateJob(_ id: UUID, _ change: @escaping (inout DownloadJob) -> Void) {
         DispatchQueue.main.async {
             guard let index = self.jobs.firstIndex(where: { $0.id == id }) else { return }
             change(&self.jobs[index])
