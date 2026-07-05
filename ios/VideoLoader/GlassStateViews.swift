@@ -8,30 +8,36 @@ struct GlassEmptyStateView: View {
     var action: (() -> Void)?
 
     var body: some View {
-        VStack(spacing: AppGlassSpacing.xl) {
-            Image(systemName: systemImage)
-                .font(.system(size: 36))
-                .foregroundStyle(AppGlassColors.textSecondary)
+        GlassCard {
+            VStack(spacing: AppGlassSpacing.lg) {
+                ZStack {
+                    Circle()
+                        .fill(AppGlassColors.glassSurfaceElevated)
+                    Image(systemName: systemImage)
+                        .font(.system(size: 30, weight: .semibold))
+                        .foregroundStyle(AppGlassColors.textSecondary)
+                }
+                .frame(width: 72, height: 72)
 
-            VStack(spacing: AppGlassSpacing.sm) {
-                Text(title)
-                    .font(AppGlassTypography.title3)
-                    .foregroundStyle(AppGlassColors.textPrimary)
-                    .multilineTextAlignment(.center)
+                VStack(spacing: AppGlassSpacing.sm) {
+                    Text(title)
+                        .font(AppGlassTypography.title3)
+                        .foregroundStyle(AppGlassColors.textPrimary)
+                        .multilineTextAlignment(.center)
 
-                Text(message)
-                    .font(AppGlassTypography.body)
-                    .foregroundStyle(AppGlassColors.textSecondary)
-                    .multilineTextAlignment(.center)
-            }
+                    Text(message)
+                        .font(AppGlassTypography.body)
+                        .foregroundStyle(AppGlassColors.textSecondary)
+                        .multilineTextAlignment(.center)
+                }
 
-            if let actionTitle, let action {
-                Button(actionTitle, action: action)
-                    .buttonStyle(GlassPrimaryButtonStyle())
+                if let actionTitle, let action {
+                    Button(actionTitle, action: action)
+                        .buttonStyle(GlassPrimaryButtonStyle())
+                }
             }
         }
         .frame(maxWidth: .infinity)
-        .padding(AppGlassSpacing.xxl)
     }
 }
 

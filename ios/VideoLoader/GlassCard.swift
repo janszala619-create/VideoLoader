@@ -11,16 +11,16 @@ struct GlassCard<Content: View>: View {
         .background(
             RoundedRectangle(cornerRadius: AppGlassTheme.radiusLarge, style: .continuous)
                 .fill(AppGlassColors.glassSurface)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: AppGlassTheme.radiusLarge, style: .continuous))
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: AppGlassTheme.radiusLarge, style: .continuous))
         )
         .overlay(
             RoundedRectangle(cornerRadius: AppGlassTheme.radiusLarge, style: .continuous)
                 .fill(
                     LinearGradient(
                         colors: [
-                            AppGlassColors.glassHighlight.opacity(0.10),
+                            AppGlassColors.glassHighlight.opacity(0.14),
                             Color.clear,
-                            AppGlassColors.accentGlow.opacity(0.10)
+                            AppGlassColors.accentGlow.opacity(0.12)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing

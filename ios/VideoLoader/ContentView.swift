@@ -78,6 +78,9 @@ struct ContentView: View {
             .background(AppGlassBackground())
             .navigationTitle("VideoLoader")
             .navigationBarTitleDisplayMode(.large)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {

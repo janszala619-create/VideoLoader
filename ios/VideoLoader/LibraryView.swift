@@ -56,6 +56,9 @@ struct LibraryView: View {
             .background(AppGlassBackground(glowAlignment: .topLeading))
             .navigationTitle("Meine Videos")
             .navigationBarTitleDisplayMode(.large)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
                 if !videos.isEmpty {
                     ToolbarItem(placement: .topBarTrailing) {

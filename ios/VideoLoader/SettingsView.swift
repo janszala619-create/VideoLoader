@@ -65,6 +65,9 @@ struct SettingsView: View {
             .background(AppGlassBackground())
             .navigationTitle("Einstellungen")
             .navigationBarTitleDisplayMode(.large)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Fertig") { dismiss() }

@@ -30,6 +30,9 @@ struct QueueView: View {
             .background(AppGlassBackground())
             .navigationTitle("Downloads")
             .navigationBarTitleDisplayMode(.large)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
                 if queue.jobs.contains(where: { $0.status == .done || $0.status == .failed }) {
                     ToolbarItem(placement: .topBarTrailing) {

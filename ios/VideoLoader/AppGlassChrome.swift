@@ -12,20 +12,20 @@ struct AppGlassBackground: View {
             )
 
             RadialGradient(
-                colors: [AppGlassColors.accentGlow.opacity(0.7), Color.clear],
+                colors: [AppGlassColors.accentGlow.opacity(0.8), Color.clear],
                 center: glowAlignment == .topLeading ? .topLeading : .topTrailing,
                 startRadius: 20,
                 endRadius: 280
             )
-            .blur(radius: 34)
+            .blur(radius: 38)
 
             RadialGradient(
-                colors: [AppGlassColors.glassHighlight.opacity(0.16), Color.clear],
+                colors: [AppGlassColors.glassHighlight.opacity(0.14), Color.clear],
                 center: .topLeading,
                 startRadius: 10,
                 endRadius: 220
             )
-            .blur(radius: 42)
+            .blur(radius: 44)
         }
         .ignoresSafeArea()
     }

@@ -55,7 +55,7 @@ struct GlassInputField<Accessory: View>: View {
             .frame(minHeight: AppGlassTheme.controlHeight)
             .background(
                 RoundedRectangle(cornerRadius: AppGlassTheme.radiusMedium, style: .continuous)
-                    .fill(AppGlassColors.glassSurfaceStrong)
+                    .fill(AppGlassColors.glassSurfaceElevated)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: AppGlassTheme.radiusMedium, style: .continuous)

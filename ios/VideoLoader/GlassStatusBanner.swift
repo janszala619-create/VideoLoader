@@ -66,11 +66,11 @@ struct GlassStatusBanner: View {
         .background(
             RoundedRectangle(cornerRadius: AppGlassTheme.radiusLarge, style: .continuous)
                 .fill(AppGlassColors.glassSurfaceStrong)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: AppGlassTheme.radiusLarge, style: .continuous))
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: AppGlassTheme.radiusLarge, style: .continuous))
         )
         .overlay(
             RoundedRectangle(cornerRadius: AppGlassTheme.radiusLarge, style: .continuous)
-                .stroke(tone.tint.opacity(0.22), lineWidth: 1)
+                .stroke(tone.tint.opacity(0.24), lineWidth: 1)
         )
     }
 }
