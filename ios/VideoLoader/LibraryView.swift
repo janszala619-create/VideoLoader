@@ -52,7 +52,7 @@ struct LibraryView: View {
 
     private var glassBackground: some View {
         LinearGradient(
-            colors: [AppGlassColors.bgElevated, AppGlassColors.bgBase, AppGlassColors.bgDeep],
+            colors: [AppGlassColors.bgAccentTop, AppGlassColors.bgBase, AppGlassColors.bgDeep],
             startPoint: .top,
             endPoint: .bottom
         )
@@ -160,6 +160,8 @@ struct LibraryView: View {
                 }
             }
         }
+        .listStyle(.plain)
+        .listRowSeparator(.hidden)
         .scrollContentBackground(.hidden)
     }
 

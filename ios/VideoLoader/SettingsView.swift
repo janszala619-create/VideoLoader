@@ -7,20 +7,42 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
 
     private var glassBackground: some View {
-        LinearGradient(
-            colors: [AppGlassColors.bgElevated, AppGlassColors.bgBase, AppGlassColors.bgDeep],
-            startPoint: .top,
-            endPoint: .bottom
-        )
+        ZStack {
+            LinearGradient(
+                colors: [AppGlassColors.bgAccentTop, AppGlassColors.bgBase, AppGlassColors.bgDeep],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            RadialGradient(
+                colors: [AppGlassColors.accentGlow.opacity(0.7), Color.clear],
+                center: .topTrailing,
+                startRadius: 10,
+                endRadius: 260
+            )
+            .blur(radius: 28)
+        }
     }
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: AppGlassTheme.sectionSpacing) {
+                VStack(alignment: .leading, spacing: AppGlassTheme.sectionSpacing) {
+                    VStack(alignment: .leading, spacing: AppGlassSpacing.sm) {
+                        Text("Verbindung")
+                            .font(AppGlassTypography.largeTitle)
+                            .foregroundStyle(AppGlassColors.textPrimary)
+
+                        Text("Wähle den Server, der am zuverlässigsten zu deinem Setup passt.")
+                            .font(AppGlassTypography.body)
+                            .foregroundStyle(AppGlassColors.textSecondary)
+                    }
+
                     GlassCard {
                         VStack(alignment: .leading, spacing: AppGlassSpacing.md) {
-                            Text("Aktiver Server")
+                            sectionLabel("Aktiver Server")
+
+                            Text("Server-Modus")
                                 .font(AppGlassTypography.headline)
                                 .foregroundStyle(AppGlassColors.textPrimary)
 
@@ -60,7 +82,7 @@ struct SettingsView: View {
             .padding(AppGlassTheme.screenPadding)
             .background(glassBackground.ignoresSafeArea())
             .navigationTitle("Einstellungen")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Fertig") { dismiss() }
@@ -78,12 +100,14 @@ struct SettingsView: View {
     ) -> some View {
         GlassCard {
             VStack(alignment: .leading, spacing: AppGlassSpacing.md) {
-                Text(title)
+                sectionLabel(title)
+
+                Text("Server-Adresse")
                     .font(AppGlassTypography.headline)
                     .foregroundStyle(AppGlassColors.textPrimary)
 
                 GlassInputField(
-                    label: "Server-Adresse",
+                    label: "URL",
                     placeholder: placeholder,
                     text: text,
                     helperText: helperText,
@@ -94,6 +118,13 @@ struct SettingsView: View {
                 )
             }
         }
+    }
+
+    private func sectionLabel(_ text: String) -> some View {
+        Text(text.uppercased())
+            .font(AppGlassTypography.subheadline)
+            .foregroundStyle(AppGlassColors.textSecondary)
+            .tracking(1.2)
     }
 }
 

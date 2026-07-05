@@ -10,6 +10,7 @@ enum AppGlassTheme {
     static let controlHeight: CGFloat = 44
     static let screenPadding: CGFloat = AppGlassSpacing.lg
     static let sectionSpacing: CGFloat = AppGlassSpacing.xl
+    static let heroSpacing: CGFloat = AppGlassSpacing.xxl
 }
 
 struct AppGlassShadow {

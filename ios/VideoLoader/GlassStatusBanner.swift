@@ -33,11 +33,16 @@ struct GlassStatusBanner: View {
     var action: (() -> Void)?
 
     var body: some View {
-        GlassCard {
+        VStack(alignment: .leading, spacing: AppGlassSpacing.md) {
             HStack(alignment: .top, spacing: AppGlassSpacing.md) {
-                Image(systemName: tone.iconName)
-                    .font(.headline)
-                    .foregroundStyle(tone.tint)
+                ZStack {
+                    Circle()
+                        .fill(tone.tint.opacity(0.18))
+                    Image(systemName: tone.iconName)
+                        .font(.headline)
+                        .foregroundStyle(tone.tint)
+                }
+                .frame(width: 44, height: 44)
 
                 VStack(alignment: .leading, spacing: AppGlassSpacing.xs) {
                     Text(title)
@@ -57,5 +62,15 @@ struct GlassStatusBanner: View {
                     .foregroundStyle(tone.tint)
             }
         }
+        .padding(AppGlassSpacing.lg)
+        .background(
+            RoundedRectangle(cornerRadius: AppGlassTheme.radiusLarge, style: .continuous)
+                .fill(AppGlassColors.glassSurfaceStrong)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: AppGlassTheme.radiusLarge, style: .continuous))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: AppGlassTheme.radiusLarge, style: .continuous)
+                .stroke(tone.tint.opacity(0.22), lineWidth: 1)
+        )
     }
 }

@@ -34,6 +34,8 @@ struct VideoLoaderApp: App {
                     .tag(2)
             }
             .tint(AppGlassColors.accentPrimary)
+            .toolbarBackground(.visible, for: .tabBar)
+            .toolbarBackground(.regularMaterial, for: .tabBar)
             .onOpenURL { url in
                 // Vom Teilen-Menü kommt videoloader://add?url=<Link>
                 if let link = Self.parseSharedLink(from: url) {

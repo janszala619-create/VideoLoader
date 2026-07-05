@@ -36,62 +36,71 @@ struct ContentView: View {
     }
 
     private var glassBackground: some View {
-        LinearGradient(
-            colors: [AppGlassColors.bgElevated, AppGlassColors.bgBase, AppGlassColors.bgDeep],
-            startPoint: .top,
-            endPoint: .bottom
-        )
+        ZStack {
+            LinearGradient(
+                colors: [AppGlassColors.bgAccentTop, AppGlassColors.bgBase, AppGlassColors.bgDeep],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            RadialGradient(
+                colors: [AppGlassColors.accentGlow.opacity(0.9), Color.clear],
+                center: .topTrailing,
+                startRadius: 20,
+                endRadius: 280
+            )
+            .blur(radius: 30)
+
+            RadialGradient(
+                colors: [AppGlassColors.glassHighlight.opacity(0.22), Color.clear],
+                center: .topLeading,
+                startRadius: 10,
+                endRadius: 220
+            )
+            .blur(radius: 40)
+        }
     }
 
     var body: some View {
         NavigationStack {
-            Form {
-                serverSection
-                linkSection
+            ScrollView {
+                VStack(alignment: .leading, spacing: AppGlassTheme.sectionSpacing) {
+                    serverSection
+                    linkSection
 
-                if let errorMessage {
-                    Section {
+                    if let errorMessage {
                         GlassErrorStateView(
                             title: "Aktion fehlgeschlagen",
                             message: errorMessage,
                             actionTitle: "Einstellungen öffnen",
                             action: { showSettings = true }
                         )
-                        .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
-                        .listRowBackground(Color.clear)
                     }
-                }
 
-                if isLoadingInfo {
-                    Section {
+                    if isLoadingInfo {
                         GlassLoadingStateView(
                             title: "Video wird geprüft",
                             message: "Metadaten und verfügbare Qualitäten werden geladen."
                         )
-                        .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
-                        .listRowBackground(Color.clear)
                     }
-                }
 
-                if let justQueuedTitle {
-                    Section {
+                    if let justQueuedTitle {
                         GlassStatusBanner(
                             tone: .success,
                             title: "Zur Warteschlange hinzugefügt",
                             message: "„\(justQueuedTitle)“ wird jetzt im Tab „Downloads“ weiterverarbeitet."
                         )
-                        .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
-                        .listRowBackground(Color.clear)
+                    }
+
+                    if let info {
+                        previewSection(info)
+                        qualitySection(info)
+                        downloadSection
                     }
                 }
-
-                if let info {
-                    previewSection(info)
-                    qualitySection(info)
-                    downloadSection
-                }
             }
-            .scrollContentBackground(.hidden)
+            .padding(.horizontal, AppGlassTheme.screenPadding)
+            .padding(.top, AppGlassSpacing.md)
             .background(glassBackground.ignoresSafeArea())
             .navigationTitle("VideoLoader")
             .navigationBarTitleDisplayMode(.large)
@@ -136,29 +145,31 @@ struct ContentView: View {
     // MARK: - Abschnitte
 
     private var serverSection: some View {
-        Section("Server") {
-            Picker("Aktiver Server", selection: $activeServerRaw) {
-                ForEach(ServerKind.allCases) { kind in
-                    Text(kind.label).tag(kind.rawValue)
-                }
-            }
-            .pickerStyle(.segmented)
-            .onChange(of: activeServerRaw) { _, _ in
-                info = nil
-                errorMessage = nil
-                Task { await checkServer() }
-            }
-            .tint(AppGlassColors.accentPrimary)
+        VStack(alignment: .leading, spacing: AppGlassSpacing.md) {
+            sectionTitle("Server")
 
-            GlassStatusBanner(
-                tone: serverStatusTone,
-                title: serverStatusTitle,
-                message: serverStatusText,
-                actionTitle: "Erneut prüfen",
-                action: { Task { await checkServer() } }
-            )
-            .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
-            .listRowBackground(Color.clear)
+            GlassCard {
+                Picker("Aktiver Server", selection: $activeServerRaw) {
+                    ForEach(ServerKind.allCases) { kind in
+                        Text(kind.label).tag(kind.rawValue)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .onChange(of: activeServerRaw) { _, _ in
+                    info = nil
+                    errorMessage = nil
+                    Task { await checkServer() }
+                }
+                .tint(AppGlassColors.accentPrimary)
+
+                GlassStatusBanner(
+                    tone: serverStatusTone,
+                    title: serverStatusTitle,
+                    message: serverStatusText,
+                    actionTitle: "Erneut prüfen",
+                    action: { Task { await checkServer() } }
+                )
+            }
         }
     }
 
@@ -197,69 +208,69 @@ struct ContentView: View {
     }
 
     private var linkSection: some View {
-        Section("Video-Link") {
-            GlassInputField(
-                label: "Link",
-                placeholder: "Link hier einfügen",
-                text: $videoLink,
-                helperText: "Füge einen direkten Video-Link ein oder übernimm einen erkannten Link aus der Zwischenablage.",
-                keyboardType: .URL,
-                textContentType: .URL,
-                autocapitalization: .never,
-                disablesAutocorrection: true
-            ) {
-                if videoLink.isEmpty {
+        VStack(alignment: .leading, spacing: AppGlassSpacing.md) {
+            sectionTitle("Video-Link")
+
+            GlassCard {
+                GlassInputField(
+                    label: "Link",
+                    placeholder: "Link hier einfügen",
+                    text: $videoLink,
+                    helperText: "Füge einen direkten Video-Link ein oder übernimm einen erkannten Link aus der Zwischenablage.",
+                    keyboardType: .URL,
+                    textContentType: .URL,
+                    autocapitalization: .never,
+                    disablesAutocorrection: true
+                ) {
+                    if videoLink.isEmpty {
+                        Button {
+                            if let pasted = UIPasteboard.general.string {
+                                videoLink = pasted
+                                errorMessage = nil
+                                Task { await loadInfo() }
+                            }
+                        } label: {
+                            Image(systemName: "doc.on.clipboard")
+                                .foregroundStyle(AppGlassColors.textSecondary)
+                        }
+                        .frame(minWidth: AppGlassTheme.controlHeight, minHeight: AppGlassTheme.controlHeight)
+                        .accessibilityLabel("Link aus Zwischenablage einfügen")
+                    } else {
+                        Button {
+                            videoLink = ""
+                            info = nil
+                            errorMessage = nil
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(AppGlassColors.textSecondary)
+                        }
+                        .frame(minWidth: AppGlassTheme.controlHeight, minHeight: AppGlassTheme.controlHeight)
+                        .accessibilityLabel("Linkfeld leeren")
+                    }
+                }
+
+                Button {
+                    Task { await loadInfo() }
+                } label: {
+                    Label("Video prüfen", systemImage: "magnifyingglass")
+                }
+                .buttonStyle(GlassSecondaryButtonStyle())
+                .disabled(cleanedLink.isEmpty || isLoadingInfo)
+
+                if clipboardHasLink && videoLink.isEmpty {
                     Button {
                         if let pasted = UIPasteboard.general.string {
                             videoLink = pasted
+                            clipboardHasLink = false
                             errorMessage = nil
                             Task { await loadInfo() }
                         }
                     } label: {
-                        Image(systemName: "doc.on.clipboard")
-                            .foregroundStyle(AppGlassColors.textSecondary)
+                        Label("Link aus Zwischenablage übernehmen", systemImage: "link.badge.plus")
                     }
-                    .frame(minWidth: AppGlassTheme.controlHeight, minHeight: AppGlassTheme.controlHeight)
-                    .accessibilityLabel("Link aus Zwischenablage einfügen")
-                } else {
-                    Button {
-                        videoLink = ""
-                        info = nil
-                        errorMessage = nil
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(AppGlassColors.textSecondary)
-                    }
-                    .frame(minWidth: AppGlassTheme.controlHeight, minHeight: AppGlassTheme.controlHeight)
-                    .accessibilityLabel("Linkfeld leeren")
+                    .buttonStyle(.borderless)
+                    .foregroundStyle(AppGlassColors.accentSecondary)
                 }
-            }
-            .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
-            .listRowBackground(Color.clear)
-
-            Button {
-                Task { await loadInfo() }
-            } label: {
-                Label("Video prüfen", systemImage: "magnifyingglass")
-            }
-            .buttonStyle(GlassSecondaryButtonStyle())
-            .disabled(cleanedLink.isEmpty || isLoadingInfo)
-            .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
-            .listRowBackground(Color.clear)
-
-            if clipboardHasLink && videoLink.isEmpty {
-                Button {
-                    if let pasted = UIPasteboard.general.string {
-                        videoLink = pasted
-                        clipboardHasLink = false
-                        errorMessage = nil
-                        Task { await loadInfo() }
-                    }
-                } label: {
-                    Label("Link aus Zwischenablage übernehmen", systemImage: "link.badge.plus")
-                }
-                .buttonStyle(.borderless)
-                .foregroundStyle(AppGlassColors.accentSecondary)
             }
         }
     }
@@ -277,7 +288,9 @@ struct ContentView: View {
     }
 
     private func previewSection(_ info: VideoInfo) -> some View {
-        Section("Vorschau") {
+        VStack(alignment: .leading, spacing: AppGlassSpacing.md) {
+            sectionTitle("Vorschau")
+
             GlassCard {
                 ZStack {
                     AsyncImage(url: info.thumbnailURL) { image in
@@ -318,13 +331,13 @@ struct ContentView: View {
                 .font(AppGlassTypography.subheadline)
                 .foregroundStyle(AppGlassColors.textSecondary)
             }
-            .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
-            .listRowBackground(Color.clear)
         }
     }
 
     private func qualitySection(_ info: VideoInfo) -> some View {
-        Section("Qualität") {
+        VStack(alignment: .leading, spacing: AppGlassSpacing.md) {
+            sectionTitle("Qualität")
+
             GlassCard {
                 if info.qualities.isEmpty {
                     Text("Beste verfügbare Qualität")
@@ -344,27 +357,32 @@ struct ContentView: View {
                         .foregroundStyle(AppGlassColors.textSecondary)
                 }
             }
-            .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
-            .listRowBackground(Color.clear)
         }
     }
 
     @ViewBuilder
     private var downloadSection: some View {
-        Section("Download") {
+        VStack(alignment: .leading, spacing: AppGlassSpacing.md) {
+            sectionTitle("Download")
+
             Button {
                 enqueueDownload()
             } label: {
                 Label("Zur Warteschlange hinzufügen", systemImage: "arrow.down.circle.fill")
             }
             .buttonStyle(GlassPrimaryButtonStyle())
-            .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
-            .listRowBackground(Color.clear)
 
             Text("Der Download läuft im Hintergrund weiter – auch wenn du die App schließt oder das iPhone sperrst.")
                 .font(AppGlassTypography.footnote)
                 .foregroundStyle(AppGlassColors.textSecondary)
         }
+    }
+
+    private func sectionTitle(_ title: String) -> some View {
+        Text(title.uppercased())
+            .font(AppGlassTypography.subheadline)
+            .foregroundStyle(AppGlassColors.textSecondary)
+            .tracking(1.2)
     }
 
     @ViewBuilder

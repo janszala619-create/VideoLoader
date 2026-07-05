@@ -27,6 +27,8 @@ struct QueueView: View {
                             row(job)
                         }
                     }
+                    .listStyle(.plain)
+                    .listRowSeparator(.hidden)
                     .scrollContentBackground(.hidden)
                 }
             }
