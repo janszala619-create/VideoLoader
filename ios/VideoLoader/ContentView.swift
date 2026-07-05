@@ -10,7 +10,6 @@ struct ContentView: View {
     @AppStorage("activeServer") private var activeServerRaw = ServerKind.vidSave.rawValue
 
     @State private var clipboardHasLink = false
-
     @State private var videoLink = ""
     @State private var info: VideoInfo?
     @State private var isLoadingInfo = false
@@ -19,7 +18,7 @@ struct ContentView: View {
     @State private var showSettings = false
     @State private var showPreviewPlayer = false
     @State private var justQueuedTitle: String?
-    @State private var serverOnline: Bool?      // nil = wird gerade geprüft
+    @State private var serverOnline: Bool?
 
     @ObservedObject private var queue = DownloadQueue.shared
 
@@ -39,8 +38,8 @@ struct ContentView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: AppGlassTheme.sectionSpacing) {
-                    serverSection
-                    linkSection
+                    serverRow
+                    linkInputSection
 
                     if let errorMessage {
                         GlassErrorStateView(
@@ -62,14 +61,14 @@ struct ContentView: View {
                         GlassStatusBanner(
                             tone: .success,
                             title: "Zur Warteschlange hinzugefügt",
-                            message: "„\(justQueuedTitle)“ wird jetzt im Tab „Downloads“ weiterverarbeitet."
+                            message: "„\(justQueuedTitle)" wird jetzt im Tab „Downloads" verarbeitet."
                         )
                     }
 
                     if let info {
                         previewSection(info)
                         qualitySection(info)
-                        downloadSection
+                        downloadButton
                     }
                 }
             }
@@ -116,119 +115,105 @@ struct ContentView: View {
         }
     }
 
-    // MARK: - Abschnitte
+    // MARK: - Server Row (kompakt, kein eigener Abschnitt)
 
-    private var serverSection: some View {
-        VStack(alignment: .leading, spacing: AppGlassSpacing.md) {
-            AppGlassSectionHeader(title: "Server")
-
-            GlassCard {
-                Picker("Aktiver Server", selection: $activeServerRaw) {
-                    ForEach(ServerKind.allCases) { kind in
-                        Text(kind.label).tag(kind.rawValue)
-                    }
+    private var serverRow: some View {
+        HStack(spacing: AppGlassSpacing.md) {
+            Picker("", selection: $activeServerRaw) {
+                ForEach(ServerKind.allCases) { kind in
+                    Text(kind.label).tag(kind.rawValue)
                 }
-                .pickerStyle(.segmented)
-                .onChange(of: activeServerRaw) { _, _ in
-                    info = nil
-                    errorMessage = nil
-                    Task { await checkServer() }
-                }
-                .tint(AppGlassColors.accentPrimary)
-
-                GlassStatusBanner(
-                    tone: serverStatusTone,
-                    title: serverStatusTitle,
-                    message: serverStatusText,
-                    actionTitle: "Erneut prüfen",
-                    action: { Task { await checkServer() } }
-                )
             }
+            .pickerStyle(.segmented)
+            .onChange(of: activeServerRaw) { _, _ in
+                info = nil
+                errorMessage = nil
+                Task { await checkServer() }
+            }
+
+            serverStatusPill
         }
     }
 
-    private var serverStatusTone: GlassStatusTone {
-        switch serverOnline {
-        case .some(true): return .success
-        case .some(false): return .warning
-        case .none: return .neutral
+    private var serverStatusPill: some View {
+        Button {
+            Task { await checkServer() }
+        } label: {
+            HStack(spacing: 5) {
+                Circle()
+                    .fill(serverOnline == true ? AppGlassColors.success :
+                          serverOnline == false ? AppGlassColors.error :
+                          AppGlassColors.textTertiary)
+                    .frame(width: 7, height: 7)
+                    .shadow(
+                        color: serverOnline == true ? AppGlassColors.success.opacity(0.7) : .clear,
+                        radius: 4
+                    )
+
+                Text(serverOnline == true ? "Online" :
+                     serverOnline == false ? "Offline" : "…")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(AppGlassColors.textSecondary)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(
+                Capsule()
+                    .fill(AppGlassColors.glassSurfaceStrong)
+                    .overlay(Capsule().stroke(AppGlassColors.glassBorder, lineWidth: 1))
+            )
         }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Serverstatus prüfen")
     }
 
-    private var serverStatusTitle: String {
-        switch serverOnline {
-        case .some(true): return "Server erreichbar"
-        case .some(false): return "Server braucht Aufmerksamkeit"
-        case .none: return "Serverstatus wird geprüft"
-        }
-    }
+    // MARK: - Link-Eingabe (kein GlassCard-Wrapper)
 
-    private var serverStatusText: String {
-        switch serverOnline {
-        case .some(true): return "Der aktive Server antwortet und ist bereit für die Video-Prüfung."
-        case .some(false): return "Adresse oder Erreichbarkeit prüfen. Falls nötig, den Server in den Einstellungen anpassen."
-        case .none: return "Die Verbindung zum aktuell ausgewählten Server wird gerade getestet."
-        }
-    }
-
-    private func checkServer() async {
-        serverOnline = nil
-        guard !activeBaseURL.trimmingCharacters(in: .whitespaces).isEmpty else {
-            serverOnline = false
-            return
-        }
-        let api = ServerAPI(kind: activeServer, baseURL: activeBaseURL)
-        serverOnline = await api.isReachable()
-    }
-
-    private var linkSection: some View {
+    private var linkInputSection: some View {
         VStack(alignment: .leading, spacing: AppGlassSpacing.md) {
-            AppGlassSectionHeader(title: "Video-Link")
-
-            GlassCard {
-                GlassInputField(
-                    label: "Link",
-                    placeholder: "Link hier einfügen",
-                    text: $videoLink,
-                    helperText: "Füge einen direkten Video-Link ein oder übernimm einen erkannten Link aus der Zwischenablage.",
-                    keyboardType: .URL,
-                    textContentType: .URL,
-                    autocapitalization: .never,
-                    disablesAutocorrection: true
-                ) {
-                    if videoLink.isEmpty {
-                        Button {
-                            if let pasted = UIPasteboard.general.string {
-                                videoLink = pasted
-                                errorMessage = nil
-                                Task { await loadInfo() }
-                            }
-                        } label: {
-                            Image(systemName: "doc.on.clipboard")
-                                .foregroundStyle(AppGlassColors.textSecondary)
-                        }
-                        .frame(minWidth: AppGlassTheme.controlHeight, minHeight: AppGlassTheme.controlHeight)
-                        .accessibilityLabel("Link aus Zwischenablage einfügen")
-                    } else {
-                        Button {
-                            videoLink = ""
-                            info = nil
+            GlassInputField(
+                label: "Video-Link",
+                placeholder: "Link hier einfügen",
+                text: $videoLink,
+                keyboardType: .URL,
+                textContentType: .URL,
+                autocapitalization: .never,
+                disablesAutocorrection: true
+            ) {
+                if videoLink.isEmpty {
+                    Button {
+                        if let pasted = UIPasteboard.general.string {
+                            videoLink = pasted
                             errorMessage = nil
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundStyle(AppGlassColors.textSecondary)
+                            Task { await loadInfo() }
                         }
-                        .frame(minWidth: AppGlassTheme.controlHeight, minHeight: AppGlassTheme.controlHeight)
-                        .accessibilityLabel("Linkfeld leeren")
+                    } label: {
+                        Image(systemName: "doc.on.clipboard")
+                            .foregroundStyle(AppGlassColors.textSecondary)
                     }
+                    .frame(minWidth: AppGlassTheme.controlHeight, minHeight: AppGlassTheme.controlHeight)
+                    .accessibilityLabel("Link aus Zwischenablage einfügen")
+                } else {
+                    Button {
+                        videoLink = ""
+                        info = nil
+                        errorMessage = nil
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(AppGlassColors.textSecondary)
+                    }
+                    .frame(minWidth: AppGlassTheme.controlHeight, minHeight: AppGlassTheme.controlHeight)
+                    .accessibilityLabel("Linkfeld leeren")
                 }
+            }
 
+            HStack(spacing: AppGlassSpacing.sm) {
                 Button {
                     Task { await loadInfo() }
                 } label: {
-                    Label("Video prüfen", systemImage: "magnifyingglass")
+                    Label("Prüfen", systemImage: "magnifyingglass")
                 }
-                .buttonStyle(GlassSecondaryButtonStyle())
+                .buttonStyle(GlassPrimaryButtonStyle())
                 .disabled(cleanedLink.isEmpty || isLoadingInfo)
 
                 if clipboardHasLink && videoLink.isEmpty {
@@ -240,26 +225,15 @@ struct ContentView: View {
                             Task { await loadInfo() }
                         }
                     } label: {
-                        Label("Link aus Zwischenablage übernehmen", systemImage: "link.badge.plus")
+                        Label("Einfügen", systemImage: "doc.on.clipboard")
                     }
-                    .buttonStyle(.borderless)
-                    .foregroundStyle(AppGlassColors.accentSecondary)
+                    .buttonStyle(GlassSecondaryButtonStyle())
                 }
             }
         }
     }
 
-    /// Prüft ohne System-Popup, ob ein Web-Link in der Zwischenablage liegt.
-    private func detectClipboardLink() {
-        guard cleanedLink.isEmpty, info == nil else { return }
-        UIPasteboard.general.detectPatterns(for: [\.probableWebURL]) { result in
-            DispatchQueue.main.async {
-                if case .success(let patterns) = result, patterns.contains(\.probableWebURL) {
-                    clipboardHasLink = true
-                }
-            }
-        }
-    }
+    // MARK: - Vorschau
 
     private func previewSection(_ info: VideoInfo) -> some View {
         VStack(alignment: .leading, spacing: AppGlassSpacing.md) {
@@ -273,9 +247,13 @@ struct ContentView: View {
                         Rectangle()
                             .fill(AppGlassColors.glassSurfaceStrong)
                             .aspectRatio(16 / 9, contentMode: .fit)
-                            .overlay { Image(systemName: "film").font(.largeTitle).foregroundStyle(AppGlassColors.textTertiary) }
+                            .overlay {
+                                Image(systemName: "film")
+                                    .font(.largeTitle)
+                                    .foregroundStyle(AppGlassColors.textTertiary)
+                            }
                     }
-                    .clipShape(RoundedRectangle(cornerRadius: AppGlassTheme.radiusLarge))
+                    .clipShape(RoundedRectangle(cornerRadius: AppGlassTheme.radiusLarge, style: .continuous))
 
                     if info.previewURL != nil {
                         Button {
@@ -308,49 +286,46 @@ struct ContentView: View {
         }
     }
 
+    // MARK: - Qualität (Chip-Auswahl)
+
     private func qualitySection(_ info: VideoInfo) -> some View {
         VStack(alignment: .leading, spacing: AppGlassSpacing.md) {
             AppGlassSectionHeader(title: "Qualität")
 
-            GlassCard {
-                if info.qualities.isEmpty {
-                    Text("Beste verfügbare Qualität")
-                        .font(AppGlassTypography.body)
-                        .foregroundStyle(AppGlassColors.textSecondary)
-                } else {
-                    Picker("Auflösung", selection: $selectedQuality) {
+            if info.qualities.isEmpty {
+                Text("Beste verfügbare Qualität wird verwendet.")
+                    .font(AppGlassTypography.footnote)
+                    .foregroundStyle(AppGlassColors.textSecondary)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: AppGlassSpacing.sm) {
                         ForEach(info.qualities) { quality in
-                            Text(quality.label).tag(Optional(quality))
+                            QualityChip(
+                                label: quality.label,
+                                isSelected: selectedQuality?.id == quality.id
+                            ) {
+                                selectedQuality = quality
+                            }
                         }
                     }
-                    .pickerStyle(.menu)
-                    .tint(AppGlassColors.accentSecondary)
-
-                    Text("Wenn eine Auswahl fehlschlägt, versucht die App automatisch eine kompatible Variante.")
-                        .font(AppGlassTypography.footnote)
-                        .foregroundStyle(AppGlassColors.textSecondary)
+                    .padding(.vertical, 2)
                 }
             }
         }
     }
 
-    @ViewBuilder
-    private var downloadSection: some View {
-        VStack(alignment: .leading, spacing: AppGlassSpacing.md) {
-            AppGlassSectionHeader(title: "Download")
+    // MARK: - Download
 
-            Button {
-                enqueueDownload()
-            } label: {
-                Label("Zur Warteschlange hinzufügen", systemImage: "arrow.down.circle.fill")
-            }
-            .buttonStyle(GlassPrimaryButtonStyle())
-
-            Text("Der Download läuft im Hintergrund weiter – auch wenn du die App schließt oder das iPhone sperrst.")
-                .font(AppGlassTypography.footnote)
-                .foregroundStyle(AppGlassColors.textSecondary)
+    private var downloadButton: some View {
+        Button {
+            enqueueDownload()
+        } label: {
+            Label("Download starten", systemImage: "arrow.down.circle.fill")
         }
+        .buttonStyle(GlassPrimaryButtonStyle())
     }
+
+    // MARK: - Vorschau-Player Sheet
 
     @ViewBuilder
     private var previewPlayerSheet: some View {
@@ -366,7 +341,6 @@ struct ContentView: View {
 
     // MARK: - Aktionen
 
-    /// Übernimmt einen per Teilen-Menü empfangenen Link und prüft ihn direkt.
     private func consumePendingLink() {
         guard let link = pendingLink, !link.isEmpty else { return }
         pendingLink = nil
@@ -374,6 +348,27 @@ struct ContentView: View {
         justQueuedTitle = nil
         errorMessage = nil
         Task { await loadInfo() }
+    }
+
+    private func detectClipboardLink() {
+        guard cleanedLink.isEmpty, info == nil else { return }
+        UIPasteboard.general.detectPatterns(for: [\.probableWebURL]) { result in
+            DispatchQueue.main.async {
+                if case .success(let patterns) = result, patterns.contains(\.probableWebURL) {
+                    clipboardHasLink = true
+                }
+            }
+        }
+    }
+
+    private func checkServer() async {
+        serverOnline = nil
+        guard !activeBaseURL.trimmingCharacters(in: .whitespaces).isEmpty else {
+            serverOnline = false
+            return
+        }
+        let api = ServerAPI(kind: activeServer, baseURL: activeBaseURL)
+        serverOnline = await api.isReachable()
     }
 
     private func loadInfo() async {
@@ -406,16 +401,51 @@ struct ContentView: View {
                 primaryURL: url,
                 fallbackURL: fallback == url ? nil : fallback
             )
-            // Formular für das nächste Video freimachen
             justQueuedTitle = title
             videoLink = ""
             info = nil
             errorMessage = nil
+            Task {
+                try? await Task.sleep(for: .seconds(3))
+                justQueuedTitle = nil
+            }
         } catch let error as APIError {
             errorMessage = error.errorDescription
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+}
+
+// MARK: - Qualitäts-Chip
+
+private struct QualityChip: View {
+    let label: String
+    let isSelected: Bool
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            Text(label)
+                .font(.subheadline.weight(isSelected ? .semibold : .regular))
+                .foregroundStyle(isSelected ? .white : AppGlassColors.textSecondary)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(
+                    Capsule()
+                        .fill(isSelected ? AppGlassColors.accentPrimary : AppGlassColors.glassSurfaceStrong)
+                        .shadow(color: isSelected ? AppGlassColors.accentGlow : .clear, radius: 8, x: 0, y: 4)
+                )
+                .overlay(
+                    Capsule()
+                        .stroke(
+                            isSelected ? AppGlassColors.accentPrimary.opacity(0.5) : AppGlassColors.glassBorder,
+                            lineWidth: 1
+                        )
+                )
+        }
+        .buttonStyle(.plain)
+        .animation(.easeOut(duration: 0.15), value: isSelected)
     }
 }
 

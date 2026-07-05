@@ -29,7 +29,7 @@ struct VideoLoaderApp: App {
                     .tag(1)
                 LibraryView()
                     .tabItem {
-                        Label("Meine Videos", systemImage: "film.stack")
+                        Label("Bibliothek", systemImage: "film.stack")
                     }
                     .tag(2)
             }

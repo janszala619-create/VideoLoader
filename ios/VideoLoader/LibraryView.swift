@@ -54,7 +54,7 @@ struct LibraryView: View {
         NavigationStack {
             mainContent
             .background(AppGlassBackground(glowAlignment: .topLeading))
-            .navigationTitle("Meine Videos")
+            .navigationTitle("Bibliothek")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 if !videos.isEmpty {
