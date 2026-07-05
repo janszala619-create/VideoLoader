@@ -2,6 +2,8 @@ import SwiftUI
 import AVKit
 
 struct ContentView: View {
+    @Binding var pendingLink: String?
+
     @AppStorage("serverURL_videoLoader") private var macServerURL = ""
     @AppStorage("serverURL_vidSave") private var cloudServerURL = "http://158.101.168.11:8765"
     @AppStorage("activeServer") private var activeServerRaw = ServerKind.vidSave.rawValue
@@ -88,6 +90,10 @@ struct ContentView: View {
             .onAppear {
                 if activeBaseURL.isEmpty { showSettings = true }
                 Task { await checkServer() }
+                consumePendingLink()
+            }
+            .onChange(of: pendingLink) { _, _ in
+                consumePendingLink()
             }
         }
     }
@@ -285,6 +291,15 @@ struct ContentView: View {
         )
     }
 
+    /// Übernimmt einen per Teilen-Menü empfangenen Link und prüft ihn direkt.
+    private func consumePendingLink() {
+        guard let link = pendingLink, !link.isEmpty else { return }
+        pendingLink = nil
+        videoLink = link
+        justQueuedTitle = nil
+        Task { await loadInfo() }
+    }
+
     private func loadInfo() async {
         info = nil
         justQueuedTitle = nil
@@ -327,5 +342,5 @@ struct ContentView: View {
 }
 
 #Preview {
-    ContentView()
+    ContentView(pendingLink: .constant(nil))
 }

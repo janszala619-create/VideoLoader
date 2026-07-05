@@ -15,5 +15,16 @@
 	<array>
 		<string>audio</string>
 	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>de.jansz.VideoLoader</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>videoloader</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>
