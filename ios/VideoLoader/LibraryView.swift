@@ -50,18 +50,10 @@ struct LibraryView: View {
         ByteCountFormatter.string(fromByteCount: totalSize, countStyle: .file)
     }
 
-    private var glassBackground: some View {
-        LinearGradient(
-            colors: [AppGlassColors.bgElevated, AppGlassColors.bgBase, AppGlassColors.bgDeep],
-            startPoint: .top,
-            endPoint: .bottom
-        )
-    }
-
     var body: some View {
         NavigationStack {
             mainContent
-                .background(glassBackground.ignoresSafeArea())
+                .background(PremiumAuroraBackground())
             .navigationTitle("Meine Videos")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
@@ -81,7 +73,7 @@ struct LibraryView: View {
                             }
                         } label: {
                             Image(systemName: "ellipsis.circle")
-                                .foregroundStyle(AppGlassColors.textPrimary)
+                                .foregroundStyle(AppColorsPremium.textPrimary)
                         }
                     }
                 }
@@ -131,13 +123,13 @@ struct LibraryView: View {
     @ViewBuilder
     private var mainContent: some View {
         if videos.isEmpty {
-            GlassEmptyStateView(
+            EmptyStateView(
                 title: "Noch keine Videos",
                 message: "Lade im Tab „Laden“ ein Video herunter. Es erscheint dann hier und kann abgespielt, geteilt oder in Fotos gesichert werden.",
                 systemImage: "film.stack"
             )
         } else if filteredVideos.isEmpty {
-            GlassEmptyStateView(
+            EmptyStateView(
                 title: "Keine Treffer",
                 message: emptySearchMessage,
                 systemImage: "magnifyingglass"
@@ -166,31 +158,31 @@ struct LibraryView: View {
     }
 
     private var overviewCard: some View {
-        GlassCard {
-            HStack(alignment: .center, spacing: AppGlassSpacing.md) {
-                VStack(alignment: .leading, spacing: AppGlassSpacing.xs) {
+        PremiumGlassCard {
+            HStack(alignment: .center, spacing: AppThemePremium.md) {
+                VStack(alignment: .leading, spacing: AppThemePremium.xs) {
                     Text("Mediathek")
-                        .font(AppGlassTypography.headline)
-                        .foregroundStyle(AppGlassColors.textPrimary)
+                        .font(.headline)
+                        .foregroundStyle(AppColorsPremium.textPrimary)
                     Text("\(videos.count) Video\(videos.count == 1 ? "" : "s") gespeichert")
-                        .font(AppGlassTypography.footnote)
-                        .foregroundStyle(AppGlassColors.textSecondary)
+                        .font(.footnote)
+                        .foregroundStyle(AppColorsPremium.textSecondary)
                 }
 
                 Spacer()
 
                 Text(totalSizeText)
-                    .font(AppGlassTypography.subheadline)
-                    .foregroundStyle(AppGlassColors.textPrimary)
-                    .padding(.horizontal, AppGlassSpacing.md)
-                    .padding(.vertical, AppGlassSpacing.sm)
+                    .font(.subheadline)
+                    .foregroundStyle(AppColorsPremium.textPrimary)
+                    .padding(.horizontal, AppThemePremium.md)
+                    .padding(.vertical, AppThemePremium.sm)
                     .background(
                         Capsule(style: .continuous)
-                            .fill(AppGlassColors.glassSurfaceStrong)
+                            .fill(AppColorsPremium.glassSurfaceStrong)
                     )
                     .overlay(
                         Capsule(style: .continuous)
-                            .stroke(AppGlassColors.glassBorder, lineWidth: 1)
+                            .stroke(AppColorsPremium.glassBorder, lineWidth: 1)
                     )
             }
         }
@@ -199,35 +191,35 @@ struct LibraryView: View {
     }
 
     private func row(_ video: DownloadedVideo) -> some View {
-        GlassCard {
-            HStack(alignment: .top, spacing: AppGlassSpacing.md) {
+        PremiumGlassCard {
+            HStack(alignment: .top, spacing: AppThemePremium.md) {
                 VideoThumbnail(url: video.url)
 
-                VStack(alignment: .leading, spacing: AppGlassSpacing.xs) {
+                VStack(alignment: .leading, spacing: AppThemePremium.xs) {
                     Text(video.name)
-                        .font(AppGlassTypography.headline)
-                        .foregroundStyle(AppGlassColors.textPrimary)
+                        .font(.headline)
+                        .foregroundStyle(AppColorsPremium.textPrimary)
                         .lineLimit(2)
                     Text("\(video.sizeText) · \(video.date.formatted(date: .abbreviated, time: .shortened))")
-                        .font(AppGlassTypography.footnote)
-                        .foregroundStyle(AppGlassColors.textSecondary)
+                        .font(.footnote)
+                        .foregroundStyle(AppColorsPremium.textSecondary)
                 }
 
                 Spacer(minLength: 0)
             }
 
-            HStack(spacing: AppGlassSpacing.md) {
+            HStack(spacing: AppThemePremium.md) {
                 Button {
                     selectedVideo = video
                 } label: {
                     Label("Abspielen", systemImage: "play.fill")
                 }
-                .buttonStyle(GlassPrimaryButtonStyle())
+                .buttonStyle(PremiumPrimaryButtonStyle())
 
                 ShareLink(item: video.url) {
                     Label("Teilen", systemImage: "square.and.arrow.up")
                 }
-                .buttonStyle(GlassSecondaryButtonStyle())
+                .buttonStyle(PremiumSecondaryButtonStyle())
             }
 
             Button {
@@ -236,8 +228,8 @@ struct LibraryView: View {
                 Label("In Fotos sichern", systemImage: "photo.badge.plus")
             }
             .buttonStyle(.borderless)
-            .font(AppGlassTypography.footnote.weight(.semibold))
-            .foregroundStyle(AppGlassColors.accentSecondary)
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(AppColorsPremium.accentTeal)
         }
         .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
         .listRowBackground(Color.clear)
@@ -271,7 +263,7 @@ struct LibraryView: View {
             } label: {
                 Label("Umbenennen", systemImage: "pencil")
             }
-            .tint(AppGlassColors.accentPrimary)
+            .tint(AppColorsPremium.accentBlue)
         }
     }
 
@@ -335,18 +327,18 @@ struct VideoThumbnail: View {
                     .aspectRatio(contentMode: .fill)
             } else {
                 Rectangle()
-                    .fill(AppGlassColors.glassSurfaceStrong)
+                    .fill(AppColorsPremium.glassSurfaceStrong)
                     .overlay {
                         Image(systemName: "film")
-                            .foregroundStyle(AppGlassColors.textTertiary)
+                            .foregroundStyle(AppColorsPremium.textTertiary)
                     }
             }
         }
         .frame(width: 104, height: 60)
-        .clipShape(RoundedRectangle(cornerRadius: AppGlassTheme.radiusMedium, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: AppThemePremium.radiusMedium, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: AppGlassTheme.radiusMedium, style: .continuous)
-                .stroke(AppGlassColors.glassBorder, lineWidth: 1)
+            RoundedRectangle(cornerRadius: AppThemePremium.radiusMedium, style: .continuous)
+                .stroke(AppColorsPremium.glassBorder, lineWidth: 1)
         )
         .task {
             if image == nil {

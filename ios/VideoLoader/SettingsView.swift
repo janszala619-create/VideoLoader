@@ -6,23 +6,15 @@ struct SettingsView: View {
     @Binding var activeServerRaw: String
     @Environment(\.dismiss) private var dismiss
 
-    private var glassBackground: some View {
-        LinearGradient(
-            colors: [AppGlassColors.bgElevated, AppGlassColors.bgBase, AppGlassColors.bgDeep],
-            startPoint: .top,
-            endPoint: .bottom
-        )
-    }
-
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: AppGlassTheme.sectionSpacing) {
-                    GlassCard {
-                        VStack(alignment: .leading, spacing: AppGlassSpacing.md) {
+                VStack(spacing: AppThemePremium.sectionSpacing) {
+                    PremiumGlassCard {
+                        VStack(alignment: .leading, spacing: AppThemePremium.md) {
                             Text("Aktiver Server")
-                                .font(AppGlassTypography.headline)
-                                .foregroundStyle(AppGlassColors.textPrimary)
+                                .font(.headline)
+                                .foregroundStyle(AppColorsPremium.textPrimary)
 
                             Picker("Server", selection: $activeServerRaw) {
                                 ForEach(ServerKind.allCases) { kind in
@@ -30,14 +22,25 @@ struct SettingsView: View {
                                 }
                             }
                             .pickerStyle(.segmented)
-                            .tint(AppGlassColors.accentPrimary)
+                            .tint(AppColorsPremium.accentBlue)
 
                             if let activeServer = ServerKind(rawValue: activeServerRaw) {
-                                GlassStatusBanner(
-                                    tone: .neutral,
-                                    title: activeServer.label,
-                                    message: activeServer.settingsHint
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(activeServer.label)
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(AppColorsPremium.accentBlue)
+                                    Text(activeServer.settingsHint)
+                                        .font(.caption)
+                                        .foregroundStyle(AppColorsPremium.textSecondary)
+                                }
+                                .padding(AppThemePremium.md)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(AppColorsPremium.glassSurface)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: AppThemePremium.radiusSmall)
+                                        .stroke(AppColorsPremium.glassBorder, lineWidth: 0.8)
                                 )
+                                .cornerRadius(AppThemePremium.radiusSmall)
                             }
                         }
                     }
@@ -57,14 +60,14 @@ struct SettingsView: View {
                     )
                 }
             }
-            .padding(AppGlassTheme.screenPadding)
-            .background(glassBackground.ignoresSafeArea())
+            .padding(AppThemePremium.screenPadding)
+            .background(PremiumAuroraBackground())
             .navigationTitle("Einstellungen")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Fertig") { dismiss() }
-                        .foregroundStyle(AppGlassColors.textPrimary)
+                        .foregroundStyle(AppColorsPremium.accentBlue)
                 }
             }
         }
@@ -76,22 +79,22 @@ struct SettingsView: View {
         placeholder: String,
         helperText: String
     ) -> some View {
-        GlassCard {
-            VStack(alignment: .leading, spacing: AppGlassSpacing.md) {
+        PremiumGlassCard {
+            VStack(alignment: .leading, spacing: AppThemePremium.md) {
                 Text(title)
-                    .font(AppGlassTypography.headline)
-                    .foregroundStyle(AppGlassColors.textPrimary)
+                    .font(.headline)
+                    .foregroundStyle(AppColorsPremium.textPrimary)
 
-                GlassInputField(
-                    label: "Server-Adresse",
+                PremiumGlassInputField(
                     placeholder: placeholder,
                     text: text,
-                    helperText: helperText,
-                    keyboardType: .URL,
-                    textContentType: .URL,
-                    autocapitalization: .never,
-                    disablesAutocorrection: true
+                    icon: "server.rack",
+                    onIconTap: {}
                 )
+                Text(helperText)
+                    .font(.caption)
+                    .foregroundStyle(AppColorsPremium.textSecondary)
+
             }
         }
     }
