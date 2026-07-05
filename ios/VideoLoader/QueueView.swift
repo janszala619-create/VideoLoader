@@ -4,35 +4,30 @@ import SwiftUI
 struct QueueView: View {
     @ObservedObject private var queue = DownloadQueue.shared
 
-    private var glassBackground: some View {
-        LinearGradient(
-            colors: [AppGlassColors.bgElevated, AppGlassColors.bgBase, AppGlassColors.bgDeep],
-            startPoint: .top,
-            endPoint: .bottom
-        )
-    }
-
     var body: some View {
         NavigationStack {
-            Group {
-                if queue.jobs.isEmpty {
-                    GlassEmptyStateView(
-                        title: "Keine Downloads",
-                        message: "Füge im Tab „Laden“ ein Video hinzu. Mehrere Videos werden nacheinander abgearbeitet – auch wenn die App geschlossen ist.",
-                        systemImage: "arrow.down.circle"
-                    )
-                } else {
-                    List {
-                        ForEach(queue.jobs.reversed()) { job in
-                            row(job)
+            ScrollView {
+                VStack(alignment: .leading, spacing: AppGlassTheme.sectionSpacing) {
+                    heroCard
+
+                    if queue.jobs.isEmpty {
+                        GlassEmptyStateView(
+                            title: "Keine Downloads",
+                            message: "Füge im Tab „Laden“ ein Video hinzu. Mehrere Videos werden nacheinander abgearbeitet – auch wenn die App geschlossen ist.",
+                            systemImage: "arrow.down.circle"
+                        )
+                    } else {
+                        VStack(spacing: AppGlassSpacing.md) {
+                            ForEach(queue.jobs.reversed()) { job in
+                                row(job)
+                            }
                         }
                     }
-                    .listStyle(.plain)
-                    .listRowSeparator(.hidden)
-                    .scrollContentBackground(.hidden)
                 }
             }
-            .background(glassBackground.ignoresSafeArea())
+            .padding(.horizontal, AppGlassTheme.screenPadding)
+            .padding(.top, AppGlassSpacing.md)
+            .background(AppGlassBackground())
             .navigationTitle("Downloads")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
@@ -43,6 +38,27 @@ struct QueueView: View {
                     }
                 }
             }
+        }
+    }
+
+    private var heroCard: some View {
+        AppGlassHeroCard(
+            title: "Warteschlange",
+            subtitle: "\(queue.jobs.count) Einträge insgesamt"
+        ) {
+                Text("\(queue.jobs.filter { $0.status == .running || $0.status == .waiting }.count) aktiv")
+                    .font(AppGlassTypography.subheadline)
+                    .foregroundStyle(AppGlassColors.textPrimary)
+                    .padding(.horizontal, AppGlassSpacing.md)
+                    .padding(.vertical, AppGlassSpacing.sm)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(AppGlassColors.glassSurfaceStrong)
+                    )
+                    .overlay(
+                        Capsule(style: .continuous)
+                            .stroke(AppGlassColors.glassBorder, lineWidth: 1)
+                    )
         }
     }
 
@@ -65,8 +81,6 @@ struct QueueView: View {
 
             detailContent(job)
         }
-        .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
-        .listRowBackground(Color.clear)
         .swipeActions(edge: .trailing) {
             Button(role: .destructive) {
                 queue.remove(job)

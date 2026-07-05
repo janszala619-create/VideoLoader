@@ -35,32 +35,6 @@ struct ContentView: View {
         videoLink.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private var glassBackground: some View {
-        ZStack {
-            LinearGradient(
-                colors: [AppGlassColors.bgAccentTop, AppGlassColors.bgBase, AppGlassColors.bgDeep],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-
-            RadialGradient(
-                colors: [AppGlassColors.accentGlow.opacity(0.9), Color.clear],
-                center: .topTrailing,
-                startRadius: 20,
-                endRadius: 280
-            )
-            .blur(radius: 30)
-
-            RadialGradient(
-                colors: [AppGlassColors.glassHighlight.opacity(0.22), Color.clear],
-                center: .topLeading,
-                startRadius: 10,
-                endRadius: 220
-            )
-            .blur(radius: 40)
-        }
-    }
-
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -101,7 +75,7 @@ struct ContentView: View {
             }
             .padding(.horizontal, AppGlassTheme.screenPadding)
             .padding(.top, AppGlassSpacing.md)
-            .background(glassBackground.ignoresSafeArea())
+            .background(AppGlassBackground())
             .navigationTitle("VideoLoader")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
@@ -146,7 +120,7 @@ struct ContentView: View {
 
     private var serverSection: some View {
         VStack(alignment: .leading, spacing: AppGlassSpacing.md) {
-            sectionTitle("Server")
+            AppGlassSectionHeader(title: "Server")
 
             GlassCard {
                 Picker("Aktiver Server", selection: $activeServerRaw) {
@@ -209,7 +183,7 @@ struct ContentView: View {
 
     private var linkSection: some View {
         VStack(alignment: .leading, spacing: AppGlassSpacing.md) {
-            sectionTitle("Video-Link")
+            AppGlassSectionHeader(title: "Video-Link")
 
             GlassCard {
                 GlassInputField(
@@ -289,7 +263,7 @@ struct ContentView: View {
 
     private func previewSection(_ info: VideoInfo) -> some View {
         VStack(alignment: .leading, spacing: AppGlassSpacing.md) {
-            sectionTitle("Vorschau")
+            AppGlassSectionHeader(title: "Vorschau")
 
             GlassCard {
                 ZStack {
@@ -336,7 +310,7 @@ struct ContentView: View {
 
     private func qualitySection(_ info: VideoInfo) -> some View {
         VStack(alignment: .leading, spacing: AppGlassSpacing.md) {
-            sectionTitle("Qualität")
+            AppGlassSectionHeader(title: "Qualität")
 
             GlassCard {
                 if info.qualities.isEmpty {
@@ -363,7 +337,7 @@ struct ContentView: View {
     @ViewBuilder
     private var downloadSection: some View {
         VStack(alignment: .leading, spacing: AppGlassSpacing.md) {
-            sectionTitle("Download")
+            AppGlassSectionHeader(title: "Download")
 
             Button {
                 enqueueDownload()
@@ -376,13 +350,6 @@ struct ContentView: View {
                 .font(AppGlassTypography.footnote)
                 .foregroundStyle(AppGlassColors.textSecondary)
         }
-    }
-
-    private func sectionTitle(_ title: String) -> some View {
-        Text(title.uppercased())
-            .font(AppGlassTypography.subheadline)
-            .foregroundStyle(AppGlassColors.textSecondary)
-            .tracking(1.2)
     }
 
     @ViewBuilder

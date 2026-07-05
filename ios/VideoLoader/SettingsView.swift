@@ -6,24 +6,6 @@ struct SettingsView: View {
     @Binding var activeServerRaw: String
     @Environment(\.dismiss) private var dismiss
 
-    private var glassBackground: some View {
-        ZStack {
-            LinearGradient(
-                colors: [AppGlassColors.bgAccentTop, AppGlassColors.bgBase, AppGlassColors.bgDeep],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-
-            RadialGradient(
-                colors: [AppGlassColors.accentGlow.opacity(0.7), Color.clear],
-                center: .topTrailing,
-                startRadius: 10,
-                endRadius: 260
-            )
-            .blur(radius: 28)
-        }
-    }
-
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -40,7 +22,7 @@ struct SettingsView: View {
 
                     GlassCard {
                         VStack(alignment: .leading, spacing: AppGlassSpacing.md) {
-                            sectionLabel("Aktiver Server")
+                            AppGlassSectionHeader(title: "Aktiver Server")
 
                             Text("Server-Modus")
                                 .font(AppGlassTypography.headline)
@@ -80,7 +62,7 @@ struct SettingsView: View {
                 }
             }
             .padding(AppGlassTheme.screenPadding)
-            .background(glassBackground.ignoresSafeArea())
+            .background(AppGlassBackground())
             .navigationTitle("Einstellungen")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
@@ -100,7 +82,7 @@ struct SettingsView: View {
     ) -> some View {
         GlassCard {
             VStack(alignment: .leading, spacing: AppGlassSpacing.md) {
-                sectionLabel(title)
+                AppGlassSectionHeader(title: title)
 
                 Text("Server-Adresse")
                     .font(AppGlassTypography.headline)
@@ -120,12 +102,6 @@ struct SettingsView: View {
         }
     }
 
-    private func sectionLabel(_ text: String) -> some View {
-        Text(text.uppercased())
-            .font(AppGlassTypography.subheadline)
-            .foregroundStyle(AppGlassColors.textSecondary)
-            .tracking(1.2)
-    }
 }
 
 #Preview {

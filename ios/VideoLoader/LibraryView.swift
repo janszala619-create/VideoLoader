@@ -50,18 +50,10 @@ struct LibraryView: View {
         ByteCountFormatter.string(fromByteCount: totalSize, countStyle: .file)
     }
 
-    private var glassBackground: some View {
-        LinearGradient(
-            colors: [AppGlassColors.bgAccentTop, AppGlassColors.bgBase, AppGlassColors.bgDeep],
-            startPoint: .top,
-            endPoint: .bottom
-        )
-    }
-
     var body: some View {
         NavigationStack {
             mainContent
-            .background(glassBackground.ignoresSafeArea())
+            .background(AppGlassBackground(glowAlignment: .topLeading))
             .navigationTitle("Meine Videos")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
@@ -143,7 +135,7 @@ struct LibraryView: View {
             )
             .searchable(text: $searchText, prompt: "Videos durchsuchen")
         } else {
-            videoList
+            libraryContent
                 .searchable(text: $searchText, prompt: "Videos durchsuchen")
         }
     }
@@ -151,34 +143,27 @@ struct LibraryView: View {
     private var emptySearchMessage: String {
         "Für „\(searchText)“ wurde kein gespeichertes Video gefunden."
     }
-    private var videoList: some View {
-        List {
-            Section {
+    private var libraryContent: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: AppGlassTheme.sectionSpacing) {
                 overviewCard
-                ForEach(filteredVideos) { video in
-                    row(video)
+
+                VStack(spacing: AppGlassSpacing.md) {
+                    ForEach(filteredVideos) { video in
+                        row(video)
+                    }
                 }
             }
+            .padding(.horizontal, AppGlassTheme.screenPadding)
+            .padding(.top, AppGlassSpacing.md)
         }
-        .listStyle(.plain)
-        .listRowSeparator(.hidden)
-        .scrollContentBackground(.hidden)
     }
 
     private var overviewCard: some View {
-        GlassCard {
-            HStack(alignment: .center, spacing: AppGlassSpacing.md) {
-                VStack(alignment: .leading, spacing: AppGlassSpacing.xs) {
-                    Text("Mediathek")
-                        .font(AppGlassTypography.headline)
-                        .foregroundStyle(AppGlassColors.textPrimary)
-                    Text("\(videos.count) Video\(videos.count == 1 ? "" : "s") gespeichert")
-                        .font(AppGlassTypography.footnote)
-                        .foregroundStyle(AppGlassColors.textSecondary)
-                }
-
-                Spacer()
-
+        AppGlassHeroCard(
+            title: "Mediathek",
+            subtitle: "\(videos.count) Video\(videos.count == 1 ? "" : "s") gespeichert"
+        ) {
                 Text(totalSizeText)
                     .font(AppGlassTypography.subheadline)
                     .foregroundStyle(AppGlassColors.textPrimary)
@@ -192,10 +177,7 @@ struct LibraryView: View {
                         Capsule(style: .continuous)
                             .stroke(AppGlassColors.glassBorder, lineWidth: 1)
                     )
-            }
         }
-        .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 10, trailing: 0))
-        .listRowBackground(Color.clear)
     }
 
     private func row(_ video: DownloadedVideo) -> some View {
@@ -239,8 +221,6 @@ struct LibraryView: View {
             .font(AppGlassTypography.footnote.weight(.semibold))
             .foregroundStyle(AppGlassColors.accentSecondary)
         }
-        .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
-        .listRowBackground(Color.clear)
         .contentShape(Rectangle())
         .onTapGesture { selectedVideo = video }
         .contextMenu {
