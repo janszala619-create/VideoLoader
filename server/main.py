@@ -77,7 +77,7 @@ def _base_ydl_options(url: str) -> dict:
         "no_warnings": True,
         "noplaylist": True,
         "http_headers": _http_headers(url),
-        "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
+        "extractor_args": {"youtube": {"player_client": ["ios", "android", "web"]}},
         "logger": YtdlpLogger(),
     }
 
@@ -232,18 +232,25 @@ def _download_options(url: str, tmpdir: str, format_selector: str) -> dict:
     return opts
 
 
-def _download_error_response(request_id: str):
-    return JSONResponse(
-        status_code=502,
-        content={
-            "error": {
-                "code": "DOWNLOAD_FAILED",
-                "message": "Video download failed",
-                "phase": "download",
-                "request_id": request_id,
-            }
-        },
-    )
+def _download_error_response(
+    request_id: str,
+    exception_type: str | None = None,
+    detail: str | None = None,
+):
+    body: dict = {
+        "code": "DOWNLOAD_FAILED",
+        "message": "Video download failed",
+        "phase": "download",
+        "request_id": request_id,
+    }
+    # Der echte technische Grund (yt-dlp-Fehlertyp + Nachricht) wird mitgegeben,
+    # damit die App ihn anzeigen kann und Fehler ohne Server-Log-Zugriff
+    # diagnostizierbar sind. Die Nachricht ist bereits URL-bereinigt.
+    if exception_type:
+        body["exception_type"] = exception_type
+    if detail:
+        body["detail"] = detail
+    return JSONResponse(status_code=502, content={"error": body})
 
 
 @app.get("/api/download")
@@ -275,6 +282,8 @@ def api_download(
             info = ydl.extract_info(url, download=True)
     except Exception as exc:
         shutil.rmtree(tmpdir, ignore_errors=True)
+        exc_type = type(exc).__name__
+        exc_msg = _sanitize_log_text(str(exc))
         logger.error(
             "download_failed request_id=%s url=%s quality=%s selector=%s yt_dlp=%s "
             "extractor=%s phase=download exception_type=%s message=%s traceback=%s",
@@ -284,11 +293,11 @@ def api_download(
             format_selector,
             YT_DLP_VERSION,
             getattr(exc, "ie", None) or "unknown",
-            type(exc).__name__,
-            _sanitize_log_text(str(exc)),
+            exc_type,
+            exc_msg,
             _sanitize_log_text(traceback.format_exc()),
         )
-        return _download_error_response(request_id)
+        return _download_error_response(request_id, exception_type=exc_type, detail=exc_msg)
 
     path = _select_downloaded_video_file(tmpdir)
     if not path:
@@ -302,7 +311,14 @@ def api_download(
             format_selector,
             YT_DLP_VERSION,
         )
-        return _download_error_response(request_id)
+        return _download_error_response(
+            request_id,
+            exception_type="MissingVideoOutput",
+            detail=(
+                "yt-dlp hat keine abspielbare Videodatei erzeugt "
+                "(evtl. fehlt ffmpeg/ffprobe oder das Format hatte keine Videospur)."
+            ),
+        )
 
     title = (info.get("title") or "video")[:80]
     safe_title = "".join(c for c in title if c.isalnum() or c in " -_").strip() or "video"

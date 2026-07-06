@@ -182,6 +182,15 @@ class DownloadFlowTests(unittest.TestCase):
         self.assertEqual(payload["error"]["code"], "DOWNLOAD_FAILED")
         self.assertIn("request_id", payload["error"])
 
+    def test_download_error_includes_exception_type_and_detail(self):
+        FakeYoutubeDL.fail_download = True
+        response = main.api_download("https://example.test/watch/1", quality=720)
+        payload = json.loads(response.body)
+
+        self.assertEqual(response.status_code, 502)
+        self.assertEqual(payload["error"]["exception_type"], "RuntimeError")
+        self.assertIn("HTTP Error 404", payload["error"]["detail"])
+
     def test_log_sanitizer_removes_query_values(self):
         text = main._sanitize_log_text(
             "failed https://www.example.test/view_video.php?viewkey=abc123&token=secret"

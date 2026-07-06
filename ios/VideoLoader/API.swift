@@ -334,10 +334,13 @@ struct ServerErrorDTO: Decodable {
         let message: String
         let phase: String?
         let requestId: String?
+        let exceptionType: String?
+        let detail: String?
 
         enum CodingKeys: String, CodingKey {
-            case code, message, phase
+            case code, message, phase, detail
             case requestId = "request_id"
+            case exceptionType = "exception_type"
         }
     }
 
@@ -348,10 +351,21 @@ struct ServerErrorDTO: Decodable {
         case "MISSING_PREREQUISITE":
             return error.message
         case "DOWNLOAD_FAILED":
+            var msg = "Download fehlgeschlagen."
             if let requestId = error.requestId {
-                return "Download fehlgeschlagen. Bitte versuche es erneut. Fehler-ID: \(requestId)"
+                msg += " (Fehler-ID: \(requestId))"
             }
-            return "Download fehlgeschlagen. Bitte versuche es erneut."
+            // Den echten technischen Grund anhängen, wenn der Server ihn
+            // mitgeschickt hat – so ist der Fehler ohne Server-Log erkennbar.
+            if let exType = error.exceptionType, !exType.isEmpty {
+                msg += "\n\(exType)"
+                if let d = error.detail, !d.isEmpty {
+                    msg += ": \(d)"
+                }
+            } else if let d = error.detail, !d.isEmpty {
+                msg += "\n\(d)"
+            }
+            return msg
         default:
             return error.message
         }
