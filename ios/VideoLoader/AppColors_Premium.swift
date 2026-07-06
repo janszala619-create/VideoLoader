@@ -50,7 +50,15 @@ enum AppColorsPremium {
     static let surfaceDisabled = Color.white.opacity(0.02)
     static let textDisabled = Color.white.opacity(0.35)
     static let divider = Color.white.opacity(0.08)
+
+    // MARK: - Legacy-Aliase (Kompatibilität zu bestehenden Views)
+    static let accentPrimary = accentBlue
+    static let accentSecondary = accentTeal
+    static let accentGlow = accentBlueGlow
+    static let bgAccentTop = auroraViolet.opacity(0.35)
 }
+
+typealias AppGlassColors = AppColorsPremium
 
 extension Color {
     init(hex: UInt32) {
