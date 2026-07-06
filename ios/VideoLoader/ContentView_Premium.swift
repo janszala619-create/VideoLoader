@@ -303,14 +303,17 @@ struct ContentViewPremium: View {
                 .font(Aurora.Typography.subheadline.weight(.semibold))
                 .foregroundStyle(Aurora.Colors.textPrimary)
 
-            PremiumGlassCard {
-                Picker("Qualität", selection: $selectedQuality) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: Aurora.Spacing.sm) {
                     ForEach(info.qualities) { quality in
-                        Text(quality.label).tag(quality as QualityOption?)
+                        PremiumQualityChip(
+                            label: quality.label,
+                            isSelected: selectedQuality?.id == quality.id
+                        ) {
+                            selectedQuality = quality
+                        }
                     }
                 }
-                .pickerStyle(.menu)
-                .tint(Aurora.Colors.accentTeal)
             }
         }
     }
@@ -399,6 +402,36 @@ struct ContentViewPremium: View {
                 .ignoresSafeArea()
                 .presentationDragIndicator(.visible)
         }
+    }
+}
+
+private struct PremiumQualityChip: View {
+    let label: String
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(label)
+                .font(Aurora.Typography.caption.weight(isSelected ? .semibold : .regular))
+                .foregroundStyle(isSelected ? .white : Aurora.Colors.textSecondary)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(
+                    Capsule()
+                        .fill(isSelected ? Aurora.Colors.accentTeal : Aurora.Colors.glassBgStrong)
+                        .shadow(color: isSelected ? Aurora.Colors.accentTeal.opacity(0.25) : .clear, radius: 8, x: 0, y: 4)
+                )
+                .overlay(
+                    Capsule()
+                        .stroke(
+                            isSelected ? Aurora.Colors.accentTeal.opacity(0.5) : Aurora.Colors.glassBorder,
+                            lineWidth: 1
+                        )
+                )
+        }
+        .buttonStyle(.plain)
+        .animation(.easeOut(duration: 0.15), value: isSelected)
     }
 }
 
