@@ -2,7 +2,7 @@ name: iOS-App als IPA bauen
 
 on:
   push:
-    branches: [main]
+    branches: [main, codex/github-build-download-fix]
   workflow_dispatch:
 
 jobs:
