@@ -66,21 +66,28 @@ struct ServerAPI {
 
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
-        let dto = try decoder.decode(VideoLoaderInfoDTO.self, from: data)
+        do {
+            let dto = try decoder.decode(VideoLoaderInfoDTO.self, from: data)
 
-        var qualities = dto.heights.map {
-            QualityOption(id: "h\($0)", label: "\($0)p", height: $0, formatId: nil)
+            var qualities = dto.heights.map {
+                QualityOption(id: "h\($0)", label: "\($0)p", height: $0, formatId: nil)
+            }
+            qualities.append(QualityOption(id: "auto", label: "Automatisch (beste Qualität)", height: nil, formatId: nil))
+
+            return VideoInfo(
+                title: dto.title,
+                uploader: dto.uploader,
+                duration: dto.duration,
+                thumbnail: dto.thumbnail,
+                previewUrl: dto.previewUrl,
+                qualities: qualities
+            )
+        } catch {
+            if let dto = try? JSONDecoder().decode(VidSaveInfoDTO.self, from: data) {
+                return Self.videoInfo(from: dto)
+            }
+            throw APIError.server("Die Server-Antwort konnte nicht gelesen werden: \(Self.decodeMessage(error))")
         }
-        qualities.append(QualityOption(id: "auto", label: "Automatisch (beste Qualität)", height: nil, formatId: nil))
-
-        return VideoInfo(
-            title: dto.title,
-            uploader: dto.uploader,
-            duration: dto.duration,
-            thumbnail: dto.thumbnail,
-            previewUrl: dto.previewUrl,
-            qualities: qualities
-        )
     }
 
     private func fetchInfoVidSave(_ videoURL: String) async throws -> VideoInfo {
@@ -99,22 +106,12 @@ struct ServerAPI {
         }
         try Self.checkStatus(response: response, data: data)
 
-        let dto = try JSONDecoder().decode(VidSaveInfoDTO.self, from: data)
-
-        // "best" zuerst als bequeme Standardwahl, dann die konkreten Formate
-        var qualities = [QualityOption(id: "best", label: "Automatisch (beste Qualität)", height: nil, formatId: "best")]
-        qualities += dto.formats.map { f in
-            QualityOption(id: f.formatId, label: Self.vidSaveLabel(f), height: Self.parseHeight(f.quality), formatId: f.formatId)
+        do {
+            let dto = try JSONDecoder().decode(VidSaveInfoDTO.self, from: data)
+            return Self.videoInfo(from: dto)
+        } catch {
+            throw APIError.server("Die Server-Antwort konnte nicht gelesen werden: \(Self.decodeMessage(error))")
         }
-
-        return VideoInfo(
-            title: dto.title ?? "Video",
-            uploader: nil,
-            duration: dto.duration,
-            thumbnail: dto.thumbnail,
-            previewUrl: nil,
-            qualities: qualities
-        )
     }
 
     // MARK: - Download-Adresse
@@ -123,24 +120,16 @@ struct ServerAPI {
         switch kind {
         case .videoLoader:
             var query = [URLQueryItem(name: "url", value: videoURL)]
-            if let height = quality?.height {
+            if quality?.formatId != nil {
+                query.append(URLQueryItem(name: "format_id", value: Self.vidSaveDownloadSelector(for: quality)))
+            } else if let height = quality?.height {
                 query.append(URLQueryItem(name: "quality", value: String(height)))
             }
             return try url(path: "/api/download", query: query)
         case .vidSave:
-            let direct = "[protocol!*=m3u8][protocol!*=dash]"
-            let selector: String
-            if let height = quality?.height {
-                let h = "[height<=\(height)]"
-                selector = "bv*\(h)+ba/b\(h)[vcodec^=avc1]\(direct)/b\(h)[ext=mp4]\(direct)/b\(h)/b"
-            } else if let formatId = quality?.formatId, formatId != "best" {
-                selector = "bv*+ba/b[vcodec^=avc1]\(direct)/b[ext=mp4]\(direct)/b/\(formatId)/best"
-            } else {
-                selector = "bv*+ba/b[vcodec^=avc1]\(direct)/b[ext=mp4]\(direct)/b"
-            }
             return try url(path: "/api/download", query: [
                 URLQueryItem(name: "url", value: videoURL),
-                URLQueryItem(name: "format_id", value: selector),
+                URLQueryItem(name: "format_id", value: Self.vidSaveDownloadSelector(for: quality)),
             ])
         }
     }
@@ -187,7 +176,9 @@ struct ServerAPI {
 
     private static func vidSaveLabel(_ f: VidSaveInfoDTO.Format) -> String {
         var parts: [String] = []
-        if let quality = f.quality, !quality.isEmpty {
+        if let label = f.label, !label.isEmpty {
+            parts.append(label)
+        } else if let quality = f.quality, !quality.isEmpty {
             parts.append(quality)
         } else if let ext = f.ext, !ext.isEmpty {
             parts.append(ext.uppercased())
@@ -199,6 +190,41 @@ struct ServerAPI {
             parts.append(String(format: "≈ %.0f MB", mb))
         }
         return parts.joined(separator: " · ")
+    }
+
+    private static func videoInfo(from dto: VidSaveInfoDTO) -> VideoInfo {
+        var qualities = [QualityOption(id: "best", label: "Automatisch (beste Qualität)", height: nil, formatId: "best")]
+        qualities += dto.formats.map { f in
+            QualityOption(id: f.formatId, label: Self.vidSaveLabel(f), height: Self.parseHeight(f.quality ?? f.label), formatId: f.formatId)
+        }
+
+        return VideoInfo(
+            title: dto.title ?? "Video",
+            uploader: nil,
+            duration: dto.duration,
+            thumbnail: dto.thumbnail,
+            previewUrl: nil,
+            qualities: qualities
+        )
+    }
+
+    private static func vidSaveDownloadSelector(for quality: QualityOption?) -> String {
+        let direct = "[protocol!*=m3u8][protocol!*=dash]"
+        if let height = quality?.height {
+            let h = "[height<=\(height)]"
+            return "bv*\(h)+ba/b\(h)[vcodec^=avc1]\(direct)/b\(h)[ext=mp4]\(direct)/b\(h)/b"
+        }
+        if let formatId = quality?.formatId, formatId != "best" {
+            return "bv*+ba/b[vcodec^=avc1]\(direct)/b[ext=mp4]\(direct)/b/\(formatId)/best"
+        }
+        return "bv*+ba/b[vcodec^=avc1]\(direct)/b[ext=mp4]\(direct)/b"
+    }
+
+    private static func decodeMessage(_ error: Error) -> String {
+        if case DecodingError.keyNotFound(let key, _) = error {
+            return "Feld „\(key.stringValue)“ fehlt."
+        }
+        return error.localizedDescription
     }
 
     static func checkStatus(response: URLResponse, data: Data?) throws {
@@ -234,18 +260,46 @@ private struct VidSaveInfoDTO: Decodable {
     struct Format: Decodable {
         let formatId: String
         let quality: String?
+        let label: String?
         let ext: String?
         let filesize: Int?
 
         enum CodingKeys: String, CodingKey {
             case formatId = "format_id"
-            case quality, ext, filesize
+            case formatIdCamel = "formatId"
+            case id, quality, label, ext, filesize
+            case fileSize
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            formatId = try container.decodeIfPresent(String.self, forKey: .formatId)
+                ?? container.decodeIfPresent(String.self, forKey: .formatIdCamel)
+                ?? container.decodeIfPresent(String.self, forKey: .id)
+                ?? "best"
+            quality = try container.decodeIfPresent(String.self, forKey: .quality)
+            label = try container.decodeIfPresent(String.self, forKey: .label)
+            ext = try container.decodeIfPresent(String.self, forKey: .ext)
+            filesize = try container.decodeIfPresent(Int.self, forKey: .filesize)
+                ?? container.decodeIfPresent(Int.self, forKey: .fileSize)
         }
     }
     let title: String?
     let thumbnail: String?
     let duration: Double?
     let formats: [Format]
+
+    enum CodingKeys: String, CodingKey {
+        case title, thumbnail, duration, formats
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        title = try container.decodeIfPresent(String.self, forKey: .title)
+        thumbnail = try container.decodeIfPresent(String.self, forKey: .thumbnail)
+        duration = try container.decodeIfPresent(Double.self, forKey: .duration)
+        formats = try container.decodeIfPresent([Format].self, forKey: .formats) ?? []
+    }
 }
 
 struct ServerErrorDTO: Decodable {
@@ -265,6 +319,8 @@ struct ServerErrorDTO: Decodable {
 
     var userMessage: String {
         switch error.code {
+        case "MISSING_PREREQUISITE":
+            return error.message
         case "DOWNLOAD_FAILED":
             if let requestId = error.requestId {
                 return "Download fehlgeschlagen. Bitte versuche es erneut. Fehler-ID: \(requestId)"

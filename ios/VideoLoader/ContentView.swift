@@ -5,9 +5,10 @@ struct ContentView: View {
     @Binding var pendingLink: String?
     @Environment(\.scenePhase) private var scenePhase
 
-    @AppStorage("serverURL_videoLoader") private var macServerURL = ""
+    @AppStorage("serverURL_videoLoader") private var macServerURL = "http://100.80.105.62:8765"
     @AppStorage("serverURL_vidSave") private var cloudServerURL = "http://158.101.168.11:8765"
-    @AppStorage("activeServer") private var activeServerRaw = ServerKind.vidSave.rawValue
+    @AppStorage("activeServer") private var activeServerRaw = ServerKind.videoLoader.rawValue
+    @AppStorage("didMigrateToLocalServer8765") private var didMigrateToLocalServer = false
 
     @State private var clipboardHasLink = false
     @State private var videoLink = ""
@@ -99,6 +100,13 @@ struct ContentView: View {
                 previewPlayerSheet
             }
             .onAppear {
+                if !didMigrateToLocalServer {
+                    if macServerURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        macServerURL = "http://100.80.105.62:8765"
+                    }
+                    activeServerRaw = ServerKind.videoLoader.rawValue
+                    didMigrateToLocalServer = true
+                }
                 if activeBaseURL.isEmpty { showSettings = true }
                 Task { await checkServer() }
                 consumePendingLink()
