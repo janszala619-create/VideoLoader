@@ -65,8 +65,11 @@ class ShareViewController: UIViewController {
     }
 
     private static func appURL(forLink link: String) -> URL? {
-        guard let encoded = link.addingPercentEncoding(withAllowedCharacters: .alphanumerics) else { return nil }
-        return URL(string: "videoloader://add?url=\(encoded)")
+        var components = URLComponents()
+        components.scheme = "videoloader"
+        components.host = "add"
+        components.queryItems = [URLQueryItem(name: "url", value: link)]
+        return components.url
     }
 
     /// Öffnet die Haupt-App. Extensions haben kein UIApplication.shared,

@@ -25,6 +25,11 @@ def root():
     return {"status": "ok", "hinweis": "VideoLoader-Server läuft. Diese Adresse in der App eintragen."}
 
 
+@app.get("/health")
+def health():
+    return {"status": "ok", "yt_dlp": YT_DLP_VERSION}
+
+
 def _safe_url(url: str, max_length: int = 160) -> str:
     parts = urlsplit(url)
     safe = urlunsplit((parts.scheme, parts.netloc, parts.path, "", ""))
@@ -34,8 +39,7 @@ def _safe_url(url: str, max_length: int = 160) -> str:
 
 
 def _sanitize_log_text(text: str) -> str:
-    redacted = re.sub(r"viewkey=[A-Za-z0-9_-]+", "viewkey=<redacted>", text)
-    return re.sub(r"https?://[^\s)]+", lambda match: _safe_url(match.group(0)), redacted)
+    return re.sub(r"https?://[^\s)]+", lambda match: _safe_url(match.group(0)), text)
 
 
 class YtdlpLogger:
