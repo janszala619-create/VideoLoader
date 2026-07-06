@@ -6,103 +6,181 @@ struct SettingsView: View {
     @Binding var activeServerRaw: String
     @Environment(\.dismiss) private var dismiss
 
+    private var activeServer: ServerKind? {
+        ServerKind(rawValue: activeServerRaw)
+    }
+
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: AppGlassTheme.sectionSpacing) {
-                    VStack(alignment: .leading, spacing: AppGlassSpacing.sm) {
-                        Text("Verbindung")
-                            .font(AppGlassTypography.largeTitle)
-                            .foregroundStyle(AppGlassColors.textPrimary)
+            ZStack {
+                PremiumAuroraBackground()
 
-                        Text("Wähle den Server, der am zuverlässigsten zu deinem Setup passt.")
-                            .font(AppGlassTypography.body)
-                            .foregroundStyle(AppGlassColors.textSecondary)
-                    }
+                ScrollView {
+                    VStack(spacing: Aurora.Spacing.xl) {
 
-                    GlassCard {
-                        VStack(alignment: .leading, spacing: AppGlassSpacing.md) {
-                            AppGlassSectionHeader(title: "Aktiver Server")
+                        // MARK: - Header
+                        VStack(alignment: .leading, spacing: Aurora.Spacing.sm) {
+                            Text("Server-Konfiguration")
+                                .font(Aurora.Typography.title2)
+                                .foregroundStyle(Aurora.Colors.textPrimary)
 
-                            Text("Server-Modus")
-                                .font(AppGlassTypography.headline)
-                                .foregroundStyle(AppGlassColors.textPrimary)
+                            Text("Wähle deinen aktiven Server und trage die Adressen ein.")
+                                .font(Aurora.Typography.subheadline)
+                                .foregroundStyle(Aurora.Colors.textSecondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
 
-                            Picker("Server", selection: $activeServerRaw) {
-                                ForEach(ServerKind.allCases) { kind in
-                                    Text(kind.label).tag(kind.rawValue)
+                        // MARK: - Server Auswahl
+                        VStack(alignment: .leading, spacing: Aurora.Spacing.md) {
+                            sectionLabel("Aktiver Server")
+
+                            PremiumGlassCard {
+                                VStack(alignment: .leading, spacing: Aurora.Spacing.md) {
+                                    Picker("Server", selection: $activeServerRaw) {
+                                        ForEach(ServerKind.allCases) { kind in
+                                            Text(kind.label).tag(kind.rawValue)
+                                        }
+                                    }
+                                    .pickerStyle(.segmented)
+                                    .tint(Aurora.Colors.accentBlue)
+
+                                    if let server = activeServer {
+                                        HStack(spacing: Aurora.Spacing.md) {
+                                            Image(systemName: "info.circle.fill")
+                                                .foregroundStyle(Aurora.Colors.accentTeal)
+                                                .font(Aurora.Typography.subheadline)
+
+                                            Text(server.settingsHint)
+                                                .font(Aurora.Typography.caption)
+                                                .foregroundStyle(Aurora.Colors.textSecondary)
+                                                .fixedSize(horizontal: false, vertical: true)
+                                        }
+                                        .padding(Aurora.Spacing.md)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .background(Aurora.Colors.teal.opacity(0.06))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: Aurora.CornerRadius.small)
+                                                .stroke(Aurora.Colors.accentTeal.opacity(0.25), lineWidth: 1)
+                                        )
+                                        .cornerRadius(Aurora.CornerRadius.small)
+                                    }
                                 }
                             }
-                            .pickerStyle(.segmented)
-                            .tint(AppGlassColors.accentPrimary)
+                        }
 
-                            if let activeServer = ServerKind(rawValue: activeServerRaw) {
-                                GlassStatusBanner(
-                                    tone: .neutral,
-                                    title: activeServer.label,
-                                    message: activeServer.settingsHint
-                                )
+                        // MARK: - Cloud Server
+                        VStack(alignment: .leading, spacing: Aurora.Spacing.md) {
+                            sectionLabel("Cloud-Server")
+
+                            PremiumGlassCard {
+                                VStack(alignment: .leading, spacing: Aurora.Spacing.md) {
+                                    HStack(spacing: Aurora.Spacing.sm) {
+                                        Image(systemName: "cloud.fill")
+                                            .foregroundStyle(Aurora.Colors.accentBlue)
+                                        Text("VidSave")
+                                            .font(Aurora.Typography.headline)
+                                            .foregroundStyle(Aurora.Colors.textPrimary)
+
+                                        Spacer()
+
+                                        if activeServerRaw == ServerKind.vidSave.rawValue {
+                                            activeBadge
+                                        }
+                                    }
+
+                                    PremiumGlassInputField(
+                                        placeholder: "http://158.101.168.11:8765",
+                                        text: $cloudServerURL,
+                                        icon: cloudServerURL.isEmpty ? "exclamationmark.circle" : "checkmark.circle.fill",
+                                        onIconTap: {}
+                                    )
+
+                                    Text("Überall erreichbar, kein Mac nötig. Für YouTube und viele Plattformen oft unzuverlässig.")
+                                        .font(Aurora.Typography.caption)
+                                        .foregroundStyle(Aurora.Colors.textSecondary)
+                                }
                             }
                         }
+
+                        // MARK: - Mac Server
+                        VStack(alignment: .leading, spacing: Aurora.Spacing.md) {
+                            sectionLabel("Mac-Server")
+
+                            PremiumGlassCard {
+                                VStack(alignment: .leading, spacing: Aurora.Spacing.md) {
+                                    HStack(spacing: Aurora.Spacing.sm) {
+                                        Image(systemName: "desktopcomputer")
+                                            .foregroundStyle(Aurora.Colors.accentViolet)
+                                        Text("VideoLoader (lokal)")
+                                            .font(Aurora.Typography.headline)
+                                            .foregroundStyle(Aurora.Colors.textPrimary)
+
+                                        Spacer()
+
+                                        if activeServerRaw == ServerKind.videoLoader.rawValue {
+                                            activeBadge
+                                        }
+                                    }
+
+                                    PremiumGlassInputField(
+                                        placeholder: "http://192.168.1.23:8000",
+                                        text: $macServerURL,
+                                        icon: macServerURL.isEmpty ? "exclamationmark.circle" : "checkmark.circle.fill",
+                                        onIconTap: {}
+                                    )
+
+                                    Text("Starte `start.sh` auf dem Mac, trage die IP-Adresse ein. Im gleichen WLAN die zuverlässigste Option.")
+                                        .font(Aurora.Typography.caption)
+                                        .foregroundStyle(Aurora.Colors.textSecondary)
+                                }
+                            }
+                        }
+
+                        Spacer(minHeight: Aurora.Spacing.xxl)
                     }
-
-                    serverCard(
-                        title: "Cloud-Server (VidSave)",
-                        text: $cloudServerURL,
-                        placeholder: "http://158.101.168.11:8765",
-                        helperText: "Überall erreichbar, kein Mac nötig. Für YouTube und viele große Plattformen aber oft unzuverlässig."
-                    )
-
-                    serverCard(
-                        title: "Mac-Server (VideoLoader)",
-                        text: $macServerURL,
-                        placeholder: "http://192.168.1.23:8000",
-                        helperText: "Starte auf dem Mac `start.sh`. Die angezeigte Adresse hier eintragen. Im gleichen WLAN ist dieser Server die zuverlässigste Wahl."
-                    )
+                    .padding(Aurora.Spacing.screen)
                 }
             }
-            .padding(AppGlassTheme.screenPadding)
-            .background(AppGlassBackground())
             .navigationTitle("Einstellungen")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Fertig") { dismiss() }
-                        .foregroundStyle(AppGlassColors.textPrimary)
+                        .font(Aurora.Typography.body.weight(.semibold))
+                        .foregroundStyle(Aurora.Colors.accentBlue)
                 }
             }
         }
     }
 
-    private func serverCard(
-        title: String,
-        text: Binding<String>,
-        placeholder: String,
-        helperText: String
-    ) -> some View {
-        GlassCard {
-            VStack(alignment: .leading, spacing: AppGlassSpacing.md) {
-                AppGlassSectionHeader(title: title)
+    // MARK: - Helper Views
 
-                Text("Server-Adresse")
-                    .font(AppGlassTypography.headline)
-                    .foregroundStyle(AppGlassColors.textPrimary)
-
-                GlassInputField(
-                    label: "URL",
-                    placeholder: placeholder,
-                    text: text,
-                    helperText: helperText,
-                    keyboardType: .URL,
-                    textContentType: .URL,
-                    autocapitalization: .never,
-                    disablesAutocorrection: true
-                )
-            }
-        }
+    private func sectionLabel(_ text: String) -> some View {
+        Text(text.uppercased())
+            .font(Aurora.Typography.caption.weight(.semibold))
+            .tracking(1.2)
+            .foregroundStyle(Aurora.Colors.textTertiary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.leading, 4)
     }
 
+    private var activeBadge: some View {
+        Text("AKTIV")
+            .font(Aurora.Typography.caption2.weight(.bold))
+            .tracking(0.8)
+            .foregroundStyle(Aurora.Colors.accentBlue)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(Aurora.Colors.accentBlue.opacity(0.15))
+            .overlay(
+                Capsule()
+                    .stroke(Aurora.Colors.accentBlue.opacity(0.4), lineWidth: 1)
+            )
+            .clipShape(Capsule())
+    }
 }
+
+typealias SettingsViewPremium = SettingsView
 
 #Preview {
     SettingsView(

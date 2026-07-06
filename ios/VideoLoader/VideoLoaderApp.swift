@@ -16,36 +16,34 @@ struct VideoLoaderApp: App {
     var body: some Scene {
         WindowGroup {
             TabView(selection: $selectedTab) {
-                ContentView(pendingLink: $pendingLink)
+                ContentViewPremium(pendingLink: $pendingLink)
                     .tabItem {
-                        Label("Laden", systemImage: "arrow.down.circle")
+                        Label("Laden", systemImage: "arrow.down.circle.fill")
                     }
                     .tag(0)
-                QueueView()
+                QueueViewPremium()
                     .tabItem {
-                        Label("Downloads", systemImage: "square.and.arrow.down")
+                        Label("Downloads", systemImage: "square.and.arrow.down.fill")
                     }
                     .badge(activeCount)
                     .tag(1)
                 LibraryView()
                     .tabItem {
-                        Label("Bibliothek", systemImage: "film.stack")
+                        Label("Meine Videos", systemImage: "film.stack.fill")
                     }
                     .tag(2)
             }
-            .tint(AppGlassColors.accentPrimary)
+            .tint(Aurora.Colors.accentBlue)
             .toolbarBackground(.visible, for: .tabBar)
             .toolbarBackground(.regularMaterial, for: .tabBar)
             .toolbarColorScheme(.dark, for: .tabBar)
             .onOpenURL { url in
-                // Vom Teilen-Menü kommt videoloader://add?url=<Link>
                 if let link = Self.parseSharedLink(from: url) {
                     pendingLink = link
                     selectedTab = 0
                 }
             }
             .onChange(of: scenePhase) { _, phase in
-                // Beim Zurückkehren in den Vordergrund unfertige Downloads fortsetzen
                 if phase == .active {
                     queue.resumeIfNeeded()
                 }
@@ -53,7 +51,6 @@ struct VideoLoaderApp: App {
         }
     }
 
-    /// Liest den geteilten Link aus einer videoloader://add?url=… Adresse.
     static func parseSharedLink(from url: URL) -> String? {
         guard url.scheme == "videoloader" else { return nil }
         let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
@@ -61,13 +58,9 @@ struct VideoLoaderApp: App {
     }
 }
 
-/// Fängt das Ereignis ab, mit dem iOS die App für fertige Hintergrund-Downloads
-/// aufweckt, und reicht es an die Warteschlange weiter.
 final class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
-        // Warteschlange früh anstoßen, damit sie sich wieder mit laufenden
-        // Hintergrund-Downloads verbindet.
         _ = DownloadQueue.shared
         return true
     }
