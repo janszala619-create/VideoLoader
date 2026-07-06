@@ -358,7 +358,7 @@ struct ContentViewPremium: View {
             selectedQuality = result.qualities.first
             loadState = .loaded(result)
         } catch let error as APIError {
-            loadState = .error(error.errorDescription)
+            loadState = .error(error.errorDescription ?? error.localizedDescription)
         } catch {
             loadState = .error("Video konnte nicht geprüft werden: \(error.localizedDescription)")
         }
@@ -379,7 +379,7 @@ struct ContentViewPremium: View {
             videoLink = ""
             loadState = .idle
         } catch let error as APIError {
-            loadState = .error(error.errorDescription)
+            loadState = .error(error.errorDescription ?? error.localizedDescription)
         } catch {
             loadState = .error(error.localizedDescription)
         }

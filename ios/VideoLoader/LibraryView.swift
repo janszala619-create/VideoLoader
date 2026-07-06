@@ -126,7 +126,7 @@ struct LibraryView: View {
         if videos.isEmpty {
             EmptyStateView(
                 title: "Noch keine Videos",
-                message: "Lade im Tab „Laden" ein Video herunter. Es erscheint dann hier und kann abgespielt, geteilt oder in Fotos gesichert werden.",
+                message: "Lade im Tab „Laden“ ein Video herunter. Es erscheint dann hier und kann abgespielt, geteilt oder in Fotos gesichert werden.",
                 systemImage: "film.stack"
             )
         } else if filteredVideos.isEmpty {
@@ -143,7 +143,7 @@ struct LibraryView: View {
     }
 
     private var emptySearchMessage: String {
-        "Für „\(searchText)" wurde kein gespeichertes Video gefunden."
+        "Für „\(searchText)“ wurde kein gespeichertes Video gefunden."
     }
 
     private var libraryContent: some View {
@@ -310,7 +310,7 @@ struct LibraryView: View {
 
     private func saveToPhotos(_ video: DownloadedVideo) {
         DownloadManager.saveToPhotos(fileURL: video.url) { errorMessage in
-            feedback = errorMessage ?? "„\(video.name)" wurde in die Fotos-Galerie gesichert."
+            feedback = errorMessage ?? "„\(video.name)“ wurde in die Fotos-Galerie gesichert."
         }
     }
 }
