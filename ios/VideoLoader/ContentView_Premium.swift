@@ -238,86 +238,93 @@ struct ContentViewPremium: View {
     @ViewBuilder
     private func loadedContent(_ info: VideoInfo) -> some View {
         VStack(spacing: Aurora.Spacing.lg) {
-            // Video Preview
-            PremiumGlassCard {
-                ZStack {
-                    AsyncImage(url: info.thumbnailURL) { image in
-                        image.resizable().aspectRatio(contentMode: .fit)
-                    } placeholder: {
-                        Rectangle()
-                            .fill(Aurora.Colors.glassBgStrong)
-                            .aspectRatio(16 / 9, contentMode: .fit)
-                            .overlay {
-                                Image(systemName: "film")
-                                    .font(.largeTitle)
-                                    .foregroundStyle(Aurora.Colors.textTertiary)
-                            }
-                    }
-                    .clipShape(RoundedRectangle(cornerRadius: Aurora.CornerRadius.large))
-
-                    if info.previewURL != nil {
-                        Button {
-                            showPreviewPlayer = true
-                        } label: {
-                            Image(systemName: "play.circle.fill")
-                                .font(.system(size: 56))
-                                .foregroundStyle(.white)
-                                .shadow(color: Aurora.Colors.accentBlueGlow, radius: 12)
-                        }
-                    }
-                }
-
-                VStack(alignment: .leading, spacing: Aurora.Spacing.sm) {
-                    Text(info.title)
-                        .font(Aurora.Typography.headline)
-                        .foregroundStyle(Aurora.Colors.textPrimary)
-                        .lineLimit(2)
-
-                    HStack(spacing: 12) {
-                        if let uploader = info.uploader {
-                            Label(uploader, systemImage: "person.circle.fill")
-                                .font(Aurora.Typography.caption)
-                                .foregroundStyle(Aurora.Colors.textSecondary)
-                        }
-                        if let duration = info.durationText {
-                            Label(duration, systemImage: "clock.fill")
-                                .font(Aurora.Typography.caption)
-                                .foregroundStyle(Aurora.Colors.textSecondary)
-                        }
-                    }
-                }
-            }
-
-            // Quality Selection
+            previewCard(info)
             if !info.qualities.isEmpty {
-                VStack(alignment: .leading, spacing: Aurora.Spacing.sm) {
-                    Text("Qualität")
-                        .font(Aurora.Typography.subheadline.weight(.semibold))
-                        .foregroundStyle(Aurora.Colors.textPrimary)
+                qualitySection(info)
+            }
+            downloadButton(info)
+        }
+    }
 
-                    PremiumGlassCard {
-                        Picker("Qualität", selection: $selectedQuality) {
-                            ForEach(info.qualities) { quality in
-                                Text(quality.label).tag(Optional(quality))
-                            }
+    private func previewCard(_ info: VideoInfo) -> some View {
+        PremiumGlassCard {
+            ZStack {
+                AsyncImage(url: info.thumbnailURL) { image in
+                    image.resizable().aspectRatio(contentMode: .fit)
+                } placeholder: {
+                    Rectangle()
+                        .fill(Aurora.Colors.glassBgStrong)
+                        .aspectRatio(16 / 9, contentMode: .fit)
+                        .overlay {
+                            Image(systemName: "film")
+                                .font(.largeTitle)
+                                .foregroundStyle(Aurora.Colors.textTertiary)
                         }
-                        .pickerStyle(.menu)
-                        .tint(Aurora.Colors.accentTeal)
+                }
+                .clipShape(RoundedRectangle(cornerRadius: Aurora.CornerRadius.large))
+
+                if info.previewURL != nil {
+                    Button {
+                        showPreviewPlayer = true
+                    } label: {
+                        Image(systemName: "play.circle.fill")
+                            .font(.system(size: 56))
+                            .foregroundStyle(.white)
+                            .shadow(color: Aurora.Colors.accentBlueGlow, radius: 12)
                     }
                 }
             }
 
-            // Download Button
-            Button {
-                enqueueDownload(info)
-            } label: {
-                HStack {
-                    Image(systemName: "arrow.down.circle.fill")
-                    Text("Zur Warteschlange")
+            VStack(alignment: .leading, spacing: Aurora.Spacing.sm) {
+                Text(info.title)
+                    .font(Aurora.Typography.headline)
+                    .foregroundStyle(Aurora.Colors.textPrimary)
+                    .lineLimit(2)
+
+                HStack(spacing: 12) {
+                    if let uploader = info.uploader {
+                        Label(uploader, systemImage: "person.circle.fill")
+                            .font(Aurora.Typography.caption)
+                            .foregroundStyle(Aurora.Colors.textSecondary)
+                    }
+                    if let duration = info.durationText {
+                        Label(duration, systemImage: "clock.fill")
+                            .font(Aurora.Typography.caption)
+                            .foregroundStyle(Aurora.Colors.textSecondary)
+                    }
                 }
             }
-            .buttonStyle(PremiumPrimaryButtonStyle(accent: .blue))
         }
+    }
+
+    private func qualitySection(_ info: VideoInfo) -> some View {
+        VStack(alignment: .leading, spacing: Aurora.Spacing.sm) {
+            Text("Qualität")
+                .font(Aurora.Typography.subheadline.weight(.semibold))
+                .foregroundStyle(Aurora.Colors.textPrimary)
+
+            PremiumGlassCard {
+                Picker("Qualität", selection: $selectedQuality) {
+                    ForEach(info.qualities) { quality in
+                        Text(quality.label).tag(quality as QualityOption?)
+                    }
+                }
+                .pickerStyle(.menu)
+                .tint(Aurora.Colors.accentTeal)
+            }
+        }
+    }
+
+    private func downloadButton(_ info: VideoInfo) -> some View {
+        Button {
+            enqueueDownload(info)
+        } label: {
+            HStack {
+                Image(systemName: "arrow.down.circle.fill")
+                Text("Zur Warteschlange")
+            }
+        }
+        .buttonStyle(PremiumPrimaryButtonStyle(accent: .blue))
     }
 
     // MARK: - Actions
