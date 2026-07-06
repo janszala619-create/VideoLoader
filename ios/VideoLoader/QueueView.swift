@@ -81,7 +81,7 @@ struct QueueView: View {
 
             detailContent(job)
         }
-        .swipeActions(edge: .trailing) {
+        .contextMenu {
             Button(role: .destructive) {
                 queue.remove(job)
             } label: {

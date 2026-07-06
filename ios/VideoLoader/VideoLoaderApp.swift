@@ -34,6 +34,7 @@ struct VideoLoaderApp: App {
                     .tag(2)
             }
             .tint(AppGlassColors.accentPrimary)
+            .preferredColorScheme(.dark)
             .toolbarBackground(.visible, for: .tabBar)
             .toolbarBackground(.regularMaterial, for: .tabBar)
             .toolbarColorScheme(.dark, for: .tabBar)

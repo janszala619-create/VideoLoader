@@ -124,6 +124,7 @@ final class DownloadQueue: NSObject, ObservableObject {
     }
 
     private func launch(jobAt index: Int, url: URL) {
+        guard jobs.indices.contains(index), jobs[index].status != .running else { return }
         jobs[index].status = .running
         jobs[index].progress = 0
         jobs[index].message = nil
@@ -282,7 +283,8 @@ extension DownloadQueue: URLSessionDownloadDelegate {
 
         // Erfolg: Datei dauerhaft in „Meine Videos“ ablegen. Das muss noch in
         // diesem Callback geschehen, danach ist die temporäre Datei weg.
-        let title = jobs.first(where: { $0.id == id })?.title ?? "Video"
+        // Titel thread-safe holen (Delegate-Queue ist nicht der Main-Thread).
+        let title = DispatchQueue.main.sync { jobs.first(where: { $0.id == id })?.title ?? "Video" }
         let target = DownloadLibrary.makeDestination(
             title: title,
             fileExtension: DownloadManager.fileExtension(for: downloadTask.response)

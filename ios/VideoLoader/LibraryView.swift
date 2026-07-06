@@ -82,6 +82,8 @@ struct LibraryView: View {
             .onChange(of: doneCount) { _, _ in reload() }
             .fullScreenCover(item: $selectedVideo) { video in
                 ZStack(alignment: .topTrailing) {
+                    AppGlassColors.bgDeep.ignoresSafeArea()
+
                     PlayerView(url: video.url)
                         .ignoresSafeArea()
                     Button {
@@ -94,6 +96,7 @@ struct LibraryView: View {
                     }
                     .accessibilityLabel("Player schließen")
                 }
+                .preferredColorScheme(.dark)
             }
             .alert("Video umbenennen", isPresented: renameBinding) {
                 TextField("Name", text: $renameText)
@@ -240,19 +243,6 @@ struct LibraryView: View {
                 Label("Löschen", systemImage: "trash")
             }
         }
-        .swipeActions(edge: .trailing) {
-            Button(role: .destructive) {
-                remove(video)
-            } label: {
-                Label("Löschen", systemImage: "trash")
-            }
-            Button {
-                startRename(video)
-            } label: {
-                Label("Umbenennen", systemImage: "pencil")
-            }
-            .tint(AppGlassColors.accentPrimary)
-        }
     }
 
     // MARK: - Aktionen
@@ -336,7 +326,7 @@ struct VideoThumbnail: View {
     }
 
     private static func generate(for url: URL) async -> UIImage? {
-        let generator = AVAssetImageGenerator(asset: AVAsset(url: url))
+        let generator = AVAssetImageGenerator(asset: AVURLAsset(url: url))
         generator.appliesPreferredTrackTransform = true
         generator.maximumSize = CGSize(width: 400, height: 400)
         return await withCheckedContinuation { continuation in

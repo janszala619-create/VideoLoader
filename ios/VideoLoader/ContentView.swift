@@ -330,12 +330,21 @@ struct ContentView: View {
     @ViewBuilder
     private var previewPlayerSheet: some View {
         if let url = info?.previewURL {
-            VideoPlayer(player: AVPlayer(url: url))
-                .ignoresSafeArea()
-                .presentationDragIndicator(.visible)
+            ZStack {
+                AppGlassColors.bgDeep.ignoresSafeArea()
+                VideoPlayer(player: AVPlayer(url: url))
+                    .ignoresSafeArea()
+            }
+            .presentationDragIndicator(.visible)
+            .preferredColorScheme(.dark)
         } else {
-            Text("Für dieses Video ist keine Vorschau verfügbar.")
-                .padding()
+            ZStack {
+                AppGlassBackground()
+                Text("Für dieses Video ist keine Vorschau verfügbar.")
+                    .font(AppGlassTypography.body)
+                    .foregroundStyle(AppGlassColors.textSecondary)
+                    .padding()
+            }
         }
     }
 
