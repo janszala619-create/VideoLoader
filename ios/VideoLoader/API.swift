@@ -208,7 +208,8 @@ struct ServerAPI {
     }
 
     private static func looksLikeVideoURL(_ text: String) -> Bool {
-        guard let host = URLComponents(string: text).host?.lowercased() else { return false }
+        guard let components = URLComponents(string: text),
+              let host = components.host?.lowercased() else { return false }
         return host.contains("youtube.com") ||
             host.contains("youtu.be") ||
             host.contains("music.youtube.com") ||
