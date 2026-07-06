@@ -193,9 +193,36 @@ struct ServerAPI {
     }
 
     private static func videoInfo(from dto: VidSaveInfoDTO) -> VideoInfo {
-        var qualities = [QualityOption(id: "best", label: "Automatisch (beste Qualität)", height: nil, formatId: "best")]
-        qualities += dto.formats.map { f in
-            QualityOption(id: f.formatId, label: Self.vidSaveLabel(f), height: Self.parseHeight(f.quality ?? f.label), formatId: f.formatId)
+        let heights = dto.formats
+            .compactMap { Self.parseHeight($0.quality ?? $0.label) }
+        let uniqueHeights = Array(Set(heights)).sorted(by: >)
+
+        var qualities = [
+            QualityOption(
+                id: "auto",
+                label: "Automatisch",
+                height: nil,
+                formatId: "auto"
+            )
+        ]
+        qualities += uniqueHeights.map { height in
+            QualityOption(
+                id: "h\(height)",
+                label: "\(height)p",
+                height: height,
+                formatId: "h\(height)"
+            )
+        }
+
+        if qualities.count == 1, let firstFormat = dto.formats.first {
+            qualities.append(
+                QualityOption(
+                    id: firstFormat.formatId,
+                    label: Self.vidSaveLabel(firstFormat),
+                    height: Self.parseHeight(firstFormat.quality ?? firstFormat.label),
+                    formatId: firstFormat.formatId
+                )
+            )
         }
 
         return VideoInfo(
