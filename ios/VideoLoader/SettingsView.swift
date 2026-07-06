@@ -32,7 +32,7 @@ struct SettingsView: View {
                 }
 
                 Section("Mac-Server (VideoLoader)") {
-                    TextField("http://192.168.1.23:8000", text: $macServerURL)
+                    TextField("http://100.80.105.62:8765", text: $macServerURL)
                         .keyboardType(.URL)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
@@ -54,8 +54,8 @@ struct SettingsView: View {
 
 #Preview {
     SettingsView(
-        macServerURL: .constant(""),
+        macServerURL: .constant("http://100.80.105.62:8765"),
         cloudServerURL: .constant("http://158.101.168.11:8765"),
-        activeServerRaw: .constant(ServerKind.vidSave.rawValue)
+        activeServerRaw: .constant(ServerKind.videoLoader.rawValue)
     )
 }

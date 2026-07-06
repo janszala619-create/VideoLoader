@@ -199,6 +199,8 @@ private struct ServerErrorDTO: Decodable {
 
     var userMessage: String {
         switch error.code {
+        case "MISSING_PREREQUISITE":
+            return error.message
         case "DOWNLOAD_FAILED":
             if let requestId = error.requestId {
                 return "Download fehlgeschlagen. Bitte versuche es erneut. Fehler-ID: \(requestId)"

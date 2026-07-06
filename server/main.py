@@ -25,6 +25,32 @@ def root():
     return {"status": "ok", "hinweis": "VideoLoader-Server läuft. Diese Adresse in der App eintragen."}
 
 
+def _has_command(name: str) -> bool:
+    return shutil.which(name) is not None
+
+
+def _dependency_status() -> dict:
+    js_runtime = next((name for name in ("deno", "node", "bun", "qjs") if _has_command(name)), None)
+    cookies_path = os.path.join(os.path.dirname(__file__), "cookies.txt")
+    return {
+        "yt_dlp": YT_DLP_VERSION,
+        "ffmpeg": _has_command("ffmpeg"),
+        "ffprobe": _has_command("ffprobe"),
+        "javascript_runtime": js_runtime,
+        "cookies_file": os.path.exists(cookies_path),
+        "cookies_path": cookies_path if os.path.exists(cookies_path) else None,
+    }
+
+
+@app.get("/api/health")
+def api_health():
+    deps = _dependency_status()
+    return {
+        "status": "ok" if deps["ffmpeg"] and deps["ffprobe"] and deps["javascript_runtime"] else "degraded",
+        "requirements": deps,
+    }
+
+
 def _safe_url(url: str, max_length: int = 160) -> str:
     parts = urlsplit(url)
     safe = urlunsplit((parts.scheme, parts.netloc, parts.path, "", ""))
@@ -66,7 +92,7 @@ def _http_headers(url: str) -> dict[str, str]:
 
 
 def _base_ydl_options(url: str) -> dict:
-    return {
+    opts = {
         "quiet": True,
         "no_warnings": True,
         "noplaylist": True,
@@ -74,6 +100,26 @@ def _base_ydl_options(url: str) -> dict:
         "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
         "logger": YtdlpLogger(),
     }
+    cookies_path = os.path.join(os.path.dirname(__file__), "cookies.txt")
+    if os.path.exists(cookies_path):
+        opts["cookiefile"] = cookies_path
+    return opts
+
+
+def _youtube_prerequisite_error() -> str | None:
+    deps = _dependency_status()
+    missing = []
+    if not deps["ffmpeg"] or not deps["ffprobe"]:
+        missing.append("ffmpeg/ffprobe")
+    if not deps["javascript_runtime"]:
+        missing.append("deno oder node")
+    if not missing:
+        return None
+    return (
+        "Dem lokalen Server fehlen Voraussetzungen für zuverlässige YouTube-Downloads: "
+        + ", ".join(missing)
+        + ". Installiere sie auf dem Mac und starte server/start.sh neu."
+    )
 
 
 def _extract_info(url: str) -> dict:
@@ -90,6 +136,10 @@ def _extract_info(url: str) -> dict:
 
 @app.get("/api/info")
 def api_info(url: str = Query(..., description="Link zum Video")):
+    if "youtube.com" in url or "youtu.be" in url:
+        prerequisite_error = _youtube_prerequisite_error()
+        if prerequisite_error:
+            raise HTTPException(status_code=503, detail=prerequisite_error)
     try:
         info = _extract_info(url)
     except HTTPException:
@@ -133,7 +183,11 @@ def api_info(url: str = Query(..., description="Link zum Video")):
 
 def _format_selector(quality: int | None) -> str:
     h = f"[height<={quality}]" if quality else ""
-    return f"best{h}[ext=mp4]/best{h}/bestvideo{h}+bestaudio/best"
+    return (
+        f"bestvideo{h}[ext=mp4]+bestaudio[ext=m4a]/"
+        f"bestvideo{h}+bestaudio/"
+        f"best{h}[ext=mp4]/best{h}/best"
+    )
 
 
 def _download_options(url: str, tmpdir: str, format_selector: str) -> dict:
@@ -152,18 +206,48 @@ def _download_options(url: str, tmpdir: str, format_selector: str) -> dict:
     return opts
 
 
-def _download_error_response(request_id: str):
+def _download_error_response(request_id: str, message: str = "Video download failed", code: str = "DOWNLOAD_FAILED"):
     return JSONResponse(
         status_code=502,
         content={
             "error": {
-                "code": "DOWNLOAD_FAILED",
-                "message": "Video download failed",
+                "code": code,
+                "message": message,
                 "phase": "download",
                 "request_id": request_id,
             }
         },
     )
+
+
+def _candidate_paths(info: dict) -> list[str]:
+    paths = []
+    for key in ("filepath", "_filename"):
+        value = info.get(key)
+        if value:
+            paths.append(value)
+    for download in info.get("requested_downloads") or []:
+        for key in ("filepath", "_filename"):
+            value = download.get(key)
+            if value:
+                paths.append(value)
+    return paths
+
+
+def _find_downloaded_file(tmpdir: str, info: dict) -> str | None:
+    for path in _candidate_paths(info):
+        if os.path.isfile(path) and os.path.getsize(path) > 0:
+            return path
+
+    ignored_suffixes = (".part", ".ytdl", ".json", ".description")
+    files = [
+        os.path.join(tmpdir, f)
+        for f in os.listdir(tmpdir)
+        if os.path.isfile(os.path.join(tmpdir, f)) and not f.endswith(ignored_suffixes)
+    ]
+    if not files:
+        return None
+    return max(files, key=os.path.getsize)
 
 
 @app.get("/api/download")
@@ -176,6 +260,21 @@ def api_download(
     requested_quality = quality if quality is not None else height
     format_selector = _format_selector(requested_quality)
     tmpdir = tempfile.mkdtemp(prefix="videoloader_")
+    if "youtube.com" in url or "youtu.be" in url:
+        prerequisite_error = _youtube_prerequisite_error()
+        if prerequisite_error:
+            shutil.rmtree(tmpdir, ignore_errors=True)
+            logger.error(
+                "download_failed request_id=%s url=%s quality=%s selector=%s yt_dlp=%s "
+                "extractor=youtube phase=download exception_type=MissingPrerequisite message=%s",
+                request_id,
+                _safe_url(url),
+                requested_quality,
+                format_selector,
+                YT_DLP_VERSION,
+                prerequisite_error,
+            )
+            return _download_error_response(request_id, prerequisite_error, "MISSING_PREREQUISITE")
     try:
         logger.info(
             "download_start request_id=%s url=%s quality=%s selector=%s yt_dlp=%s phase=download",
@@ -205,9 +304,8 @@ def api_download(
         )
         return _download_error_response(request_id)
 
-    files = [os.path.join(tmpdir, f) for f in os.listdir(tmpdir)]
-    files = [f for f in files if os.path.isfile(f)]
-    if not files:
+    path = _find_downloaded_file(tmpdir, info)
+    if not path:
         shutil.rmtree(tmpdir, ignore_errors=True)
         logger.error(
             "download_failed request_id=%s url=%s quality=%s selector=%s yt_dlp=%s "
@@ -218,8 +316,10 @@ def api_download(
             format_selector,
             YT_DLP_VERSION,
         )
-        return _download_error_response(request_id)
-    path = max(files, key=os.path.getsize)
+        return _download_error_response(
+            request_id,
+            "yt-dlp finished but no video file was created. Check ffmpeg, deno/node and cookies if YouTube blocks the request.",
+        )
 
     title = (info.get("title") or "video")[:80]
     safe_title = "".join(c for c in title if c.isalnum() or c in " -_").strip() or "video"

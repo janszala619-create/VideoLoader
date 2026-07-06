@@ -4,6 +4,7 @@ cd "$(dirname "$0")"
 
 REQ_STAMP=".venv/.requirements.sha256"
 YTDLP_STAMP=".venv/.yt-dlp-updated"
+PORT="${PORT:-8765}"
 
 requirements_hash() {
   if command -v shasum >/dev/null 2>&1; then
@@ -35,13 +36,29 @@ TODAY="$(date +%Y-%m-%d)"
 LAST_YTDLP_UPDATE="$(cat "$YTDLP_STAMP" 2>/dev/null || true)"
 if [ "$TODAY" != "$LAST_YTDLP_UPDATE" ]; then
   echo "Prüfe yt-dlp-Update ..."
-  ./.venv/bin/pip install --upgrade --quiet yt-dlp
+  ./.venv/bin/pip install --upgrade --quiet "yt-dlp[default]" yt-dlp-ejs
   echo "$TODAY" > "$YTDLP_STAMP"
+fi
+
+if ! command -v ffmpeg >/dev/null 2>&1 || ! command -v ffprobe >/dev/null 2>&1; then
+  echo "WARNUNG: ffmpeg/ffprobe fehlt. YouTube-Downloads in hoher Qualität brauchen ffmpeg."
+  echo "Installieren auf macOS: brew install ffmpeg"
+  echo ""
+fi
+
+if ! command -v deno >/dev/null 2>&1 && ! command -v node >/dev/null 2>&1 && ! command -v bun >/dev/null 2>&1 && ! command -v qjs >/dev/null 2>&1; then
+  echo "WARNUNG: Keine JavaScript-Runtime gefunden. Für volle YouTube-Unterstützung wird deno oder node benötigt."
+  echo "Empfohlen auf macOS: brew install deno"
+  echo ""
 fi
 
 echo ""
 echo "Server startet. Diese Adresse in der App eintragen:"
 IP=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null)
-echo "  http://${IP:-<Mac-IP-Adresse>}:8000"
+TAILSCALE_IP=$(tailscale ip -4 2>/dev/null | head -n 1)
+if [ -n "$TAILSCALE_IP" ]; then
+  echo "  http://${TAILSCALE_IP}:${PORT}"
+fi
+echo "  http://${IP:-<Mac-IP-Adresse>}:${PORT}"
 echo ""
-./.venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000
+./.venv/bin/uvicorn main:app --host 0.0.0.0 --port "$PORT"
