@@ -212,9 +212,8 @@ struct ServerAPI {
            let payload = try? JSONDecoder().decode(LegacyErrorDTO.self, from: data) {
             throw APIError.server(payload.detail)
         }
-        if let http = response as? HTTPURLResponse,
-           http.statusCode == 422 {
-            throw APIError.server("Der Server konnte die Download-Anfrage nicht verarbeiten. Bitte pruefe Server-Typ und Server-Adresse in den Einstellungen.")
+        if http.statusCode == 422 {
+            throw APIError.server("Der Server konnte die Download-Anfrage nicht verarbeiten. Bitte prüfe Server-Typ und Server-Adresse in den Einstellungen.")
         }
         throw APIError.server("Der Server hat einen Fehler gemeldet (Code \(http.statusCode)).")
     }
@@ -249,7 +248,7 @@ private struct VidSaveInfoDTO: Decodable {
     let formats: [Format]
 }
 
-private struct ServerErrorDTO: Decodable {
+struct ServerErrorDTO: Decodable {
     struct ErrorBody: Decodable {
         let code: String
         let message: String
@@ -277,6 +276,6 @@ private struct ServerErrorDTO: Decodable {
     }
 }
 
-private struct LegacyErrorDTO: Decodable {
+struct LegacyErrorDTO: Decodable {
     let detail: String
 }

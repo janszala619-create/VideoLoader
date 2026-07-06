@@ -45,46 +45,8 @@ enum DownloadManager {
         }
         if let data = body.data(using: .utf8),
            let payload = try? JSONDecoder().decode(LegacyErrorDTO.self, from: data) {
-            let detail = payload.detail
-            if detail.contains("yt-dlp") || detail.contains("HTTP Error") || detail.contains("ERROR:") {
-                // Technische yt-dlp-Meldung durchreichen, damit die Warteschlange
-                // vorübergehende Fehler (404 usw.) erkennen und neu versuchen kann.
-                return detail
-            }
-            return detail
+            return payload.detail
         }
         return "Der Server hat einen Fehler gemeldet (Code \(code))."
     }
-}
-
-private struct ServerErrorDTO: Decodable {
-    struct ErrorBody: Decodable {
-        let code: String
-        let message: String
-        let phase: String?
-        let requestId: String?
-
-        enum CodingKeys: String, CodingKey {
-            case code, message, phase
-            case requestId = "request_id"
-        }
-    }
-
-    let error: ErrorBody
-
-    var userMessage: String {
-        switch error.code {
-        case "DOWNLOAD_FAILED":
-            if let requestId = error.requestId {
-                return "Download fehlgeschlagen. Bitte versuche es erneut. Fehler-ID: \(requestId)"
-            }
-            return "Download fehlgeschlagen. Bitte versuche es erneut."
-        default:
-            return error.message
-        }
-    }
-}
-
-private struct LegacyErrorDTO: Decodable {
-    let detail: String
 }

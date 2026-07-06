@@ -201,8 +201,8 @@ final class DownloadQueue: NSObject, ObservableObject {
     }
 
     private static func isTransient(_ message: String) -> Bool {
-        let patterns = ["HTTP Error 404", "HTTP Error 403", "HTTP Error 429",
-                        "HTTP Error 5", "timed out", "unable to download",
+        let patterns = ["HTTP Error 429", "HTTP Error 5",
+                        "timed out", "unable to download",
                         "network connection was lost", "downloaded file is empty"]
         return patterns.contains { message.localizedCaseInsensitiveContains($0) }
     }
