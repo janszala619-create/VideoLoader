@@ -36,25 +36,55 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build app for iPhone
+        shell: bash
         run: |
-          xcodebuild \
+          mkdir -p build/logs
+          APP_LOG=build/logs/VideoLoader-release.log
+          set -o pipefail
+          if ! xcodebuild \
             -project ios/VideoLoader.xcodeproj \
             -scheme VideoLoader \
             -configuration Release \
             -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
             CODE_SIGNING_ALLOWED=NO \
-            CONFIGURATION_BUILD_DIR="$PWD/build/Release-iphoneos" \
-            build
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            OTHER_CODE_SIGN_FLAGS="" \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            BUILD_DIR="$PWD/build" \
+            SYMROOT="$PWD/build" \
+            build 2>&1 | tee "$APP_LOG"; then
+            echo "::error::iOS app build failed. Last 200 log lines:"
+            tail -n 200 "$APP_LOG"
+            exit 1
+          fi
 
       - name: Package unsigned IPA
+        shell: bash
         run: |
-          mkdir -p build/ipa/Payload
-          cp -R build/Release-iphoneos/VideoLoader.app build/ipa/Payload/
-          cd build/ipa
-          zip -qry ../VideoLoader-unsigned.ipa Payload
+          set -euo pipefail
+          APP_PATH="$(find build -type d -name VideoLoader.app | head -n 1)"
+          if [ -z "$APP_PATH" ]; then
+            echo "::error::Could not find VideoLoader.app in build output."
+            exit 1
+          fi
+
+          rm -rf build/Payload build/VideoLoader-unsigned.ipa
+          mkdir -p build/Payload
+          cp -R "$APP_PATH" build/Payload/
+          (cd build && zip -qry VideoLoader-unsigned.ipa Payload)
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
         with:
           name: VideoLoader-unsigned-ipa
           path: build/VideoLoader-unsigned.ipa
+          if-no-files-found: error
+
+      - name: Upload build logs artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VideoLoader-build-logs
+          path: build/logs
+          if-no-files-found: error
