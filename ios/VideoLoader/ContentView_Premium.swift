@@ -334,9 +334,9 @@ struct ContentViewPremium: View {
 
     private func detectClipboardLink() {
         guard videoLink.isEmpty else { return }
-        UIPasteboard.general.detectPatterns(for: [\.probableWebURL]) { result in
+        UIPasteboard.general.detectPatterns(for: [.probableWebURL]) { result in
             DispatchQueue.main.async {
-                if case .success(let patterns) = result, patterns.contains(\.probableWebURL) {
+                if case .success(let patterns) = result, patterns.contains(.probableWebURL) {
                     clipboardHasLink = true
                 }
             }

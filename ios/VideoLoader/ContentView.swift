@@ -352,9 +352,9 @@ struct ContentView: View {
 
     private func detectClipboardLink() {
         guard cleanedLink.isEmpty, info == nil else { return }
-        UIPasteboard.general.detectPatterns(for: [\.probableWebURL]) { result in
+        UIPasteboard.general.detectPatterns(for: [.probableWebURL]) { result in
             DispatchQueue.main.async {
-                if case .success(let patterns) = result, patterns.contains(\.probableWebURL) {
+                if case .success(let patterns) = result, patterns.contains(.probableWebURL) {
                     clipboardHasLink = true
                 }
             }
