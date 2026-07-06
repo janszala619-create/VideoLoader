@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 
 /// Ein Auftrag in der Download-Warteschlange.
@@ -283,6 +284,11 @@ extension DownloadQueue: URLSessionDownloadDelegate {
 
         // Erfolg: Datei dauerhaft in „Meine Videos“ ablegen. Das muss noch in
         // diesem Callback geschehen, danach ist die temporäre Datei weg.
+        if let message = Self.validationError(for: location) {
+            handleError(id: id, message: message)
+            return
+        }
+
         // Titel thread-safe holen (Delegate-Queue ist nicht der Main-Thread).
         let title = DispatchQueue.main.sync { jobs.first(where: { $0.id == id })?.title ?? "Video" }
         let target = DownloadLibrary.makeDestination(
@@ -310,5 +316,27 @@ extension DownloadQueue: URLSessionDownloadDelegate {
             self.backgroundCompletionHandler?()
             self.backgroundCompletionHandler = nil
         }
+    }
+
+    private static func validationError(for url: URL) -> String? {
+        let values = try? url.resourceValues(forKeys: [.fileSizeKey])
+        if (values?.fileSize ?? 0) < 1024 {
+            return "Der Server hat keine gültige Videodatei geliefert."
+        }
+
+        if let handle = try? FileHandle(forReadingFrom: url) {
+            defer { try? handle.close() }
+            if let data = try? handle.read(upToCount: 1),
+               let first = data.first,
+               first == 123 || first == 91 || first == 60 {
+                return "Der Server hat eine Fehlerantwort statt eines Videos geliefert."
+            }
+        }
+
+        let asset = AVURLAsset(url: url)
+        if asset.tracks(withMediaType: .video).isEmpty {
+            return "Die heruntergeladene Datei enthält keinen abspielbaren Video-Track."
+        }
+        return nil
     }
 }

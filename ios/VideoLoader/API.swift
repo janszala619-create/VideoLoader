@@ -209,15 +209,15 @@ struct ServerAPI {
     }
 
     private static func vidSaveDownloadSelector(for quality: QualityOption?) -> String {
-        let direct = "[protocol!*=m3u8][protocol!*=dash]"
-        if let height = quality?.height {
-            let h = "[height<=\(height)]"
-            return "bv*\(h)+ba/b\(h)[vcodec^=avc1]\(direct)/b\(h)[ext=mp4]\(direct)/b\(h)/b"
-        }
-        if let formatId = quality?.formatId, formatId != "best" {
-            return "bv*+ba/b[vcodec^=avc1]\(direct)/b[ext=mp4]\(direct)/b/\(formatId)/best"
-        }
-        return "bv*+ba/b[vcodec^=avc1]\(direct)/b[ext=mp4]\(direct)/b"
+        let limit = quality?.height ?? 1080
+        let h = "[height<=\(limit)]"
+        return [
+            "bestvideo\(h)[vcodec^=avc1][ext=mp4]+bestaudio[acodec^=mp4a][ext=m4a]",
+            "bestvideo\(h)[vcodec^=avc1]+bestaudio[acodec^=mp4a]",
+            "best\(h)[vcodec^=avc1][ext=mp4]",
+            "best\(h)[ext=mp4]",
+            "best\(h)",
+        ].joined(separator: "/")
     }
 
     private static func decodeMessage(_ error: Error) -> String {
