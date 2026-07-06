@@ -227,7 +227,7 @@ struct ServerAPI {
         let port = endpoint.port.map { String($0) } ?? "-"
         print("[VideoLoader] \(endpointName) host=\(endpoint.host ?? "-") port=\(port) query=\(queryNames.joined(separator: ","))")
         if let quality {
-            print("[VideoLoader] selectedQuality id=\(quality.id) label=\(quality.label) height=\(quality.height.map(String.init) ?? "nil") formatId=\(quality.formatId ?? "nil")")
+            print("[VideoLoader] selectedQuality id=\(quality.id) label=\(quality.label) height=\(quality.height.map { String($0) } ?? "nil") formatId=\(quality.formatId ?? "nil")")
         }
         if kind == .vidSave {
             print("[VideoLoader] warning=VidSave legacy server mode is active")
