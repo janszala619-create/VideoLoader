@@ -254,10 +254,13 @@ struct ServerErrorDTO: Decodable {
         let message: String
         let phase: String?
         let requestId: String?
+        let exceptionType: String?
+        let detail: String?
 
         enum CodingKeys: String, CodingKey {
-            case code, message, phase
+            case code, message, phase, detail
             case requestId = "request_id"
+            case exceptionType = "exception_type"
         }
     }
 
@@ -266,10 +269,19 @@ struct ServerErrorDTO: Decodable {
     var userMessage: String {
         switch error.code {
         case "DOWNLOAD_FAILED":
+            var msg = "Download fehlgeschlagen."
             if let requestId = error.requestId {
-                return "Download fehlgeschlagen. Bitte versuche es erneut. Fehler-ID: \(requestId)"
+                msg += " (ID: \(requestId))"
             }
-            return "Download fehlgeschlagen. Bitte versuche es erneut."
+            if let exType = error.exceptionType, !exType.isEmpty {
+                msg += "\n\(exType)"
+                if let d = error.detail, !d.isEmpty {
+                    msg += ": \(d)"
+                }
+            } else if let d = error.detail, !d.isEmpty {
+                msg += "\n\(d)"
+            }
+            return msg
         default:
             return error.message
         }

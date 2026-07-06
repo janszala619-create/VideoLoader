@@ -80,7 +80,7 @@ def _base_ydl_options(url: str) -> dict:
         "no_warnings": True,
         "noplaylist": True,
         "http_headers": _http_headers(url),
-        "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
+        "extractor_args": {"youtube": {"player_client": ["ios", "android", "web"]}},
         "logger": YtdlpLogger(),
     }
 
@@ -195,18 +195,22 @@ def _download_options(url: str, tmpdir: str, format_selector: str) -> dict:
     return opts
 
 
-def _download_error_response(request_id: str):
-    return JSONResponse(
-        status_code=502,
-        content={
-            "error": {
-                "code": "DOWNLOAD_FAILED",
-                "message": "Video download failed",
-                "phase": "download",
-                "request_id": request_id,
-            }
-        },
-    )
+def _download_error_response(
+    request_id: str,
+    exception_type: str | None = None,
+    detail: str | None = None,
+):
+    body: dict = {
+        "code": "DOWNLOAD_FAILED",
+        "message": "Video download failed",
+        "phase": "download",
+        "request_id": request_id,
+    }
+    if exception_type:
+        body["exception_type"] = exception_type
+    if detail:
+        body["detail"] = detail
+    return JSONResponse(status_code=502, content={"error": body})
 
 
 @app.get("/api/download")
@@ -233,6 +237,8 @@ def api_download(
             info = ydl.extract_info(url, download=True)
     except Exception as exc:
         shutil.rmtree(tmpdir, ignore_errors=True)
+        exc_type = type(exc).__name__
+        exc_msg = _sanitize_log_text(str(exc))
         logger.error(
             "download_failed request_id=%s url=%s quality=%s selector=%s yt_dlp=%s "
             "extractor=%s phase=download exception_type=%s message=%s traceback=%s",
@@ -242,11 +248,11 @@ def api_download(
             format_selector,
             YT_DLP_VERSION,
             getattr(exc, "ie", None) or "unknown",
-            type(exc).__name__,
-            _sanitize_log_text(str(exc)),
+            exc_type,
+            exc_msg,
             _sanitize_log_text(traceback.format_exc()),
         )
-        return _download_error_response(request_id)
+        return _download_error_response(request_id, exception_type=exc_type, detail=exc_msg)
 
     files = [os.path.join(tmpdir, f) for f in os.listdir(tmpdir)]
     files = [f for f in files if os.path.isfile(f)]
@@ -261,7 +267,11 @@ def api_download(
             format_selector,
             YT_DLP_VERSION,
         )
-        return _download_error_response(request_id)
+        return _download_error_response(
+            request_id,
+            exception_type="MissingOutput",
+            detail="yt-dlp hat keine Ausgabedatei erzeugt",
+        )
     path = max(files, key=os.path.getsize)
 
     title = (info.get("title") or "video")[:80]

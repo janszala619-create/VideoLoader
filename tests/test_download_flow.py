@@ -82,27 +82,41 @@ class DownloadFlowTests(unittest.TestCase):
         response = main.api_download("https://example.test/watch/1", quality=720)
 
         self.assertEqual(response.media_type, "video/mp4")
-        self.assertEqual(
-            FakeYoutubeDL.calls[0]["format"],
-            "best[height<=720][ext=mp4]/best[height<=720]/bestvideo[height<=720]+bestaudio/best",
+        expected = (
+            "bestvideo[height<=720][vcodec^=avc1][ext=mp4]+bestaudio[ext=m4a]/"
+            "bestvideo[height<=720][vcodec^=avc1]+bestaudio/"
+            "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/"
+            "bestvideo[height<=720]+bestaudio/"
+            "best[height<=720][ext=mp4]/"
+            "best[height<=720]/"
+            "best"
         )
+        self.assertEqual(FakeYoutubeDL.calls[0]["format"], expected)
         self.assertEqual(FakeYoutubeDL.calls[1]["download"], True)
 
     def test_1080p_download_uses_height_selector(self):
         main.api_download("https://example.test/watch/1", quality=1080)
 
-        self.assertEqual(
-            FakeYoutubeDL.calls[0]["format"],
-            "best[height<=1080][ext=mp4]/best[height<=1080]/bestvideo[height<=1080]+bestaudio/best",
+        expected = (
+            "bestvideo[height<=1080][vcodec^=avc1][ext=mp4]+bestaudio[ext=m4a]/"
+            "bestvideo[height<=1080][vcodec^=avc1]+bestaudio/"
+            "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/"
+            "bestvideo[height<=1080]+bestaudio/"
+            "best[height<=1080][ext=mp4]/"
+            "best[height<=1080]/"
+            "best"
         )
+        self.assertEqual(FakeYoutubeDL.calls[0]["format"], expected)
 
-    def test_direct_mp4_is_preferred_before_video_audio_merge(self):
+    def test_h264_split_streams_are_preferred_over_combined(self):
         main.api_download("https://example.test/watch/1", quality=1080)
 
         opts = FakeYoutubeDL.calls[0]
         self.assertEqual(opts["merge_output_format"], "mp4")
-        self.assertTrue(opts["format"].startswith("best[height<=1080][ext=mp4]/"))
-        self.assertIn("+bestaudio", opts["format"])
+        # H.264-Video + M4A-Audio (bestes iPhone-kompatibles Format) steht an erster Stelle
+        self.assertTrue(opts["format"].startswith("bestvideo[height<=1080][vcodec^=avc1][ext=mp4]+bestaudio[ext=m4a]/"))
+        # Kombinierter MP4-Stream (ohne ffmpeg) steht als Fallback weiter hinten
+        self.assertIn("/best[height<=1080][ext=mp4]/", opts["format"])
 
     def test_fragment_downloads_are_parallelized_for_hls_fallbacks(self):
         main.api_download("https://example.test/watch/1", quality=1080)
@@ -142,6 +156,15 @@ class DownloadFlowTests(unittest.TestCase):
         self.assertEqual(response.status_code, 502)
         self.assertEqual(payload["error"]["code"], "DOWNLOAD_FAILED")
         self.assertIn("request_id", payload["error"])
+
+    def test_download_error_includes_exception_type_and_detail(self):
+        FakeYoutubeDL.fail_download = True
+        response = main.api_download("https://example.test/watch/1", quality=720)
+        payload = json.loads(response.body)
+
+        self.assertEqual(response.status_code, 502)
+        self.assertEqual(payload["error"]["exception_type"], "RuntimeError")
+        self.assertIn("HTTP Error 404", payload["error"]["detail"])
 
     def test_log_sanitizer_removes_query_values(self):
         text = main._sanitize_log_text(
