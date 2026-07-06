@@ -61,7 +61,7 @@ struct ContentView: View {
                         GlassStatusBanner(
                             tone: .success,
                             title: "Zur Warteschlange hinzugefügt",
-                            message: "„\(justQueuedTitle)" wird jetzt im Tab „Downloads" verarbeitet."
+                            message: "„\(justQueuedTitle)“ wird jetzt im Tab „Downloads“ verarbeitet."
                         )
                     }
 

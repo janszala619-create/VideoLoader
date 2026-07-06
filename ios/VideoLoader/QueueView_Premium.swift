@@ -40,7 +40,7 @@ struct QueueViewPremium: View {
                     .font(Aurora.Typography.headline)
                     .foregroundStyle(Aurora.Colors.textPrimary)
 
-                Text("Starten Sie einen Download im Tab „Laden", um ihn hier zu sehen.")
+                Text("Starten Sie einen Download im Tab „Laden“, um ihn hier zu sehen.")
                     .font(Aurora.Typography.subheadline)
                     .foregroundStyle(Aurora.Colors.textSecondary)
                     .multilineTextAlignment(.center)
@@ -138,7 +138,7 @@ struct QueueViewPremium: View {
                     .foregroundStyle(Aurora.Colors.success)
                     .font(Aurora.Typography.caption)
 
-                Text("In „Meine Videos" verfügbar")
+                Text("In „Meine Videos“ verfügbar")
                     .font(Aurora.Typography.caption)
                     .foregroundStyle(Aurora.Colors.success)
 
