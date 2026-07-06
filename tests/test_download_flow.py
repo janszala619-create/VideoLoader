@@ -15,6 +15,7 @@ from server import main
 class FakeYoutubeDL:
     calls = []
     fail_download = False
+    output_extension = "mp4"
 
     def __init__(self, opts):
         self.opts = opts
@@ -36,7 +37,7 @@ class FakeYoutubeDL:
             raise RuntimeError("ERROR: unable to download video data: HTTP Error 404: Not Found")
         if download:
             outtmpl = self.opts["outtmpl"]
-            path = outtmpl.replace("%(ext)s", "mp4")
+            path = outtmpl.replace("%(ext)s", self.__class__.output_extension)
             os.makedirs(os.path.dirname(path), exist_ok=True)
             with open(path, "wb") as file:
                 file.write(b"video")
@@ -59,6 +60,13 @@ class FakeYoutubeDL:
                     "url": "https://cdn.example.test/temporary-1080-video.mp4",
                 },
                 {
+                    "height": 292,
+                    "vcodec": "avc1.640015",
+                    "acodec": "none",
+                    "ext": "mp4",
+                    "url": "https://cdn.example.test/temporary-292-video.mp4",
+                },
+                {
                     "height": None,
                     "vcodec": "none",
                     "acodec": "mp4a.40.2",
@@ -73,22 +81,46 @@ class DownloadFlowTests(unittest.TestCase):
     def setUp(self):
         FakeYoutubeDL.calls = []
         FakeYoutubeDL.fail_download = False
+        FakeYoutubeDL.output_extension = "mp4"
         self.output_dir = tempfile.TemporaryDirectory()
         self.patcher = patch.object(main.yt_dlp, "YoutubeDL", FakeYoutubeDL)
-        self.ffprobe_patcher = patch.object(main, "_FFPROBE_PATH", None)
-        self.ffmpeg_patcher = patch.object(main.shutil, "which", lambda name: f"/usr/bin/{name}" if name == "ffmpeg" else None)
+        self.ffprobe_patcher = patch.object(main, "_FFPROBE_PATH", "/usr/bin/ffprobe")
+        self.ffmpeg_patcher = patch.object(
+            main.shutil,
+            "which",
+            lambda name: f"/usr/bin/{name}" if name in {"ffmpeg", "ffprobe"} else None,
+        )
         self.output_patcher = patch.object(main, "OUTPUT_DIR", Path(self.output_dir.name))
+        self.probe_patcher = patch.object(main, "_probe_media", self.fake_probe_media)
         self.patcher.start()
         self.ffprobe_patcher.start()
         self.ffmpeg_patcher.start()
         self.output_patcher.start()
+        self.probe_patcher.start()
 
     def tearDown(self):
         self.output_patcher.stop()
         self.ffmpeg_patcher.stop()
         self.ffprobe_patcher.stop()
+        self.probe_patcher.stop()
         self.patcher.stop()
         self.output_dir.cleanup()
+
+    def fake_probe_media(self, path):
+        ext = os.path.splitext(path)[1].lower()
+        size = os.path.getsize(path) if os.path.exists(path) else 0
+        return {
+            "path": path,
+            "size": size,
+            "ext": ext,
+            "duration": 12.0 if ext not in main._AUDIO_EXTENSIONS and size > 0 else 0.0,
+            "has_video": ext not in main._AUDIO_EXTENSIONS and size > 0,
+            "video_codec": "h264" if ext == ".mp4" else "vp9",
+            "pix_fmt": "yuv420p" if ext == ".mp4" else "yuv420p",
+            "audio_codec": "aac" if ext == ".mp4" else "opus",
+            "valid": ext not in main._AUDIO_EXTENSIONS and size > 0,
+            "error": None,
+        }
 
     def test_720p_download_uses_height_selector(self):
         response = main.api_download("https://example.test/watch/1", quality=720)
@@ -149,7 +181,26 @@ class DownloadFlowTests(unittest.TestCase):
             with open(video_path, "wb") as file:
                 file.write(b"v" * 10)
 
-            self.assertEqual(main._select_downloaded_video_file(tmpdir), video_path)
+            selected, probe = main._select_downloaded_video_file(tmpdir)
+            self.assertEqual(selected, video_path)
+            self.assertTrue(probe["valid"])
+
+    def test_intermediate_split_video_audio_files_are_not_returned(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            intermediate_video = os.path.join(tmpdir, "video.f137.mp4")
+            audio_path = os.path.join(tmpdir, "video.f140.m4a")
+            final_path = os.path.join(tmpdir, "video.mp4")
+            for path, content in [
+                (intermediate_video, b"v" * 100),
+                (audio_path, b"a" * 120),
+                (final_path, b"final"),
+            ]:
+                with open(path, "wb") as file:
+                    file.write(content)
+
+            selected, probe = main._select_downloaded_video_file(tmpdir)
+            self.assertEqual(selected, final_path)
+            self.assertTrue(probe["valid"])
 
     def test_fragment_downloads_are_parallelized_for_hls_fallbacks(self):
         main.api_download("https://example.test/watch/1", quality=1080)
@@ -200,12 +251,51 @@ class DownloadFlowTests(unittest.TestCase):
         self.assertEqual(payload["error"]["code"], "MISSING_PREREQUISITE")
         self.assertIn("ffmpeg", payload["error"]["message"])
 
+    def test_download_requires_ffprobe_with_clear_error(self):
+        with patch.object(main, "_FFPROBE_PATH", None), patch.object(
+            main.shutil,
+            "which",
+            lambda name: "/usr/bin/ffmpeg" if name == "ffmpeg" else None,
+        ):
+            response = main.api_download("https://example.test/watch/1", quality=720)
+        payload = json.loads(response.body)
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(payload["error"]["code"], "MISSING_PREREQUISITE")
+        self.assertIn("ffprobe", payload["error"]["message"])
+
     def test_health_reports_diagnostics(self):
         payload = main.health()
 
         self.assertEqual(payload["status"], "ok")
         self.assertTrue(payload["ffmpeg"])
+        self.assertTrue(payload["ffprobe"])
         self.assertTrue(payload["output_dir_writable"])
+
+    def test_info_filters_unusual_raw_heights(self):
+        payload = main.api_info("https://example.test/watch/1")
+
+        self.assertIn(720, payload["heights"])
+        self.assertIn(1080, payload["heights"])
+        self.assertNotIn(292, payload["heights"])
+
+    def test_normalizes_non_ios_file_before_response(self):
+        FakeYoutubeDL.output_extension = "webm"
+
+        with patch.object(main, "_normalize_to_ios_mp4") as normalize:
+            def fake_normalize(source_path, tmpdir):
+                output_path = os.path.join(tmpdir, "normalized.mp4")
+                with open(output_path, "wb") as file:
+                    file.write(b"normalized video")
+                return output_path, self.fake_probe_media(output_path), None
+            normalize.side_effect = fake_normalize
+
+            response = main.api_download("https://example.test/watch/1", quality=720)
+
+        self.assertEqual(response.media_type, "video/mp4")
+        self.assertTrue(normalize.called)
+        saved = list(Path(self.output_dir.name).glob("*.mp4"))
+        self.assertEqual(len(saved), 1)
 
     def test_unavailable_video_returns_structured_download_error(self):
         response = main.api_download("https://gone.example.test/watch/1", quality=1080)

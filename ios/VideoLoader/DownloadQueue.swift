@@ -296,12 +296,6 @@ extension DownloadQueue: URLSessionDownloadDelegate {
 
         // Erfolg: Datei dauerhaft in „Meine Videos“ ablegen. Das muss noch in
         // diesem Callback geschehen, danach ist die temporäre Datei weg.
-        if let message = Self.validationError(for: location) {
-            handleError(id: id, message: message)
-            return
-        }
-
-        // Titel thread-safe holen (Delegate-Queue ist nicht der Main-Thread).
         let title = DispatchQueue.main.sync { jobs.first(where: { $0.id == id })?.title ?? "Video" }
         let target = DownloadLibrary.makeDestination(
             title: title,
@@ -309,6 +303,11 @@ extension DownloadQueue: URLSessionDownloadDelegate {
         )
         do {
             try FileManager.default.moveItem(at: location, to: target)
+            if let message = Self.validationError(for: target) {
+                try? FileManager.default.removeItem(at: target)
+                handleError(id: id, message: message)
+                return
+            }
             handleFinished(id: id, success: true, message: nil)
         } catch {
             handleError(id: id, message: "Die Videodatei konnte nicht gespeichert werden: \(error.localizedDescription)")

@@ -34,7 +34,11 @@ def root():
 @app.get("/health")
 def health():
     diagnostics = _diagnostics()
-    required_ok = diagnostics["output_dir"]["writable"] and diagnostics["ffmpeg"]["available"]
+    required_ok = (
+        diagnostics["output_dir"]["writable"]
+        and diagnostics["ffmpeg"]["available"]
+        and diagnostics["ffprobe"]["available"]
+    )
     return {
         "status": "ok" if required_ok else "degraded",
         "yt_dlp": YT_DLP_VERSION,
@@ -200,8 +204,14 @@ def api_info(url: str = Query(..., description="Link zum Video")):
         )
 
     formats = info.get("formats") or []
+    allowed_heights = {2160, 1440, 1080, 720, 480, 360, 240, 144}
     heights = sorted(
-        {f["height"] for f in formats if f.get("height") and f.get("vcodec") not in (None, "none")},
+        {
+            f["height"]
+            for f in formats
+            if f.get("height") in allowed_heights
+            and f.get("vcodec") not in (None, "none")
+        },
         reverse=True,
     )
 
@@ -249,53 +259,188 @@ _ARIA2C_PATH = shutil.which("aria2c")
 _FFPROBE_PATH = shutil.which("ffprobe")
 _VIDEO_EXTENSIONS = {".mp4", ".m4v", ".mov", ".webm", ".mkv"}
 _AUDIO_EXTENSIONS = {".m4a", ".mp3", ".aac", ".opus", ".ogg", ".weba", ".wav"}
+_TEMP_EXTENSIONS = {".part", ".ytdl", ".tmp", ".temp"}
+
+
+def _ffmpeg_path() -> str | None:
+    return shutil.which("ffmpeg")
+
+
+def _ffprobe_path() -> str | None:
+    return _FFPROBE_PATH or shutil.which("ffprobe")
+
+
+def _list_tmpdir_files(tmpdir: str) -> list[dict[str, int | str]]:
+    result = []
+    for root, _, filenames in os.walk(tmpdir):
+        for filename in filenames:
+            path = os.path.join(root, filename)
+            try:
+                size = os.path.getsize(path)
+            except OSError:
+                size = 0
+            result.append({"path": path, "size": size})
+    return result
+
+
+def _is_intermediate_file(path: str) -> bool:
+    name = os.path.basename(path).lower()
+    stem = os.path.splitext(name)[0]
+    return (
+        any(name.endswith(ext) for ext in _TEMP_EXTENSIONS)
+        or re.search(r"\.f\d+$", stem) is not None
+    )
+
+
+def _probe_media(path: str) -> dict:
+    ext = os.path.splitext(path)[1].lower()
+    size = os.path.getsize(path) if os.path.exists(path) else 0
+    probe = {
+        "path": path,
+        "size": size,
+        "ext": ext,
+        "duration": 0.0,
+        "has_video": False,
+        "video_codec": None,
+        "pix_fmt": None,
+        "audio_codec": None,
+        "valid": False,
+        "error": None,
+    }
+    ffprobe = _ffprobe_path()
+    if not ffprobe:
+        probe["error"] = "ffprobe_not_found"
+        return probe
+    if size <= 0 or ext in _AUDIO_EXTENSIONS or _is_intermediate_file(path):
+        return probe
+    try:
+        result = subprocess.run(
+            [
+                ffprobe,
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration:stream=codec_type,codec_name,pix_fmt",
+                "-of",
+                "json",
+                path,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=15,
+            check=False,
+        )
+        if result.returncode != 0:
+            probe["error"] = (result.stderr or "ffprobe_failed").strip()
+            return probe
+        data = json.loads(result.stdout or "{}")
+        try:
+            probe["duration"] = float((data.get("format") or {}).get("duration") or 0)
+        except (TypeError, ValueError):
+            probe["duration"] = 0.0
+        for stream in data.get("streams", []):
+            if stream.get("codec_type") == "video" and not probe["has_video"]:
+                probe["has_video"] = True
+                probe["video_codec"] = stream.get("codec_name")
+                probe["pix_fmt"] = stream.get("pix_fmt")
+            elif stream.get("codec_type") == "audio" and not probe["audio_codec"]:
+                probe["audio_codec"] = stream.get("codec_name")
+        probe["valid"] = bool(probe["has_video"] and probe["duration"] > 0 and size > 0)
+    except Exception as exc:
+        probe["error"] = f"{type(exc).__name__}: {exc}"
+        logger.warning(
+            "ffprobe_failed path=%s exception_type=%s message=%s",
+            path,
+            type(exc).__name__,
+            exc,
+        )
+    return probe
 
 
 def _has_video_track(path: str) -> bool:
-    ext = os.path.splitext(path)[1].lower()
-    if ext in _AUDIO_EXTENSIONS:
-        return False
-    if _FFPROBE_PATH:
-        try:
-            result = subprocess.run(
-                [
-                    _FFPROBE_PATH,
-                    "-v",
-                    "error",
-                    "-show_entries",
-                    "stream=codec_type",
-                    "-of",
-                    "json",
-                    path,
-                ],
-                capture_output=True,
-                text=True,
-                timeout=10,
-                check=False,
-            )
-            if result.returncode == 0:
-                data = json.loads(result.stdout or "{}")
-                return any(
-                    stream.get("codec_type") == "video"
-                    for stream in data.get("streams", [])
-                )
-        except Exception as exc:
-            logger.warning(
-                "ffprobe_failed path=%s exception_type=%s message=%s",
-                path,
-                type(exc).__name__,
-                exc,
-            )
-    return ext in _VIDEO_EXTENSIONS
+    return bool(_probe_media(path).get("valid"))
 
 
-def _select_downloaded_video_file(tmpdir: str) -> str | None:
-    files = [os.path.join(tmpdir, f) for f in os.listdir(tmpdir)]
-    files = [f for f in files if os.path.isfile(f)]
-    video_files = [f for f in files if _has_video_track(f)]
-    if not video_files:
-        return None
-    return max(video_files, key=os.path.getsize)
+def _select_downloaded_video_file(tmpdir: str) -> tuple[str | None, dict | None]:
+    probes = []
+    for item in _list_tmpdir_files(tmpdir):
+        path = str(item["path"])
+        ext = os.path.splitext(path)[1].lower()
+        if _is_intermediate_file(path) or ext in _AUDIO_EXTENSIONS:
+            continue
+        if ext not in _VIDEO_EXTENSIONS:
+            continue
+        probe = _probe_media(path)
+        probes.append(probe)
+    valid = [probe for probe in probes if probe.get("valid")]
+    if not valid:
+        return None, None
+    best = max(valid, key=lambda probe: (probe.get("duration") or 0, probe.get("size") or 0))
+    return str(best["path"]), best
+
+
+def _is_ios_compatible(path: str, probe: dict) -> bool:
+    return (
+        os.path.splitext(path)[1].lower() == ".mp4"
+        and probe.get("valid")
+        and probe.get("video_codec") == "h264"
+        and probe.get("pix_fmt") == "yuv420p"
+        and probe.get("audio_codec") in (None, "aac")
+    )
+
+
+def _normalize_to_ios_mp4(source_path: str, tmpdir: str) -> tuple[str | None, dict | None, str | None]:
+    ffmpeg = _ffmpeg_path()
+    if not ffmpeg:
+        return None, None, "ffmpeg_not_found"
+    output_path = os.path.join(tmpdir, "normalized.mp4")
+    try:
+        result = subprocess.run(
+            [
+                ffmpeg,
+                "-y",
+                "-i",
+                source_path,
+                "-map",
+                "0:v:0",
+                "-map",
+                "0:a?",
+                "-c:v",
+                "libx264",
+                "-preset",
+                "veryfast",
+                "-pix_fmt",
+                "yuv420p",
+                "-c:a",
+                "aac",
+                "-b:a",
+                "160k",
+                "-movflags",
+                "+faststart",
+                output_path,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=1800,
+            check=False,
+        )
+        if result.returncode != 0:
+            return None, None, (result.stderr or result.stdout or "ffmpeg_failed").strip()
+        probe = _probe_media(output_path)
+        if not _is_ios_compatible(output_path, probe):
+            return None, probe, "normalized_file_failed_ios_validation"
+        return output_path, probe, None
+    except Exception as exc:
+        return None, None, f"{type(exc).__name__}: {exc}"
+
+
+def _finalize_ios_video_file(path: str, probe: dict, tmpdir: str) -> tuple[str | None, dict | None, bool, str | None]:
+    if _is_ios_compatible(path, probe):
+        return path, probe, False, None
+    normalized_path, normalized_probe, error = _normalize_to_ios_mp4(path, tmpdir)
+    if error:
+        return None, normalized_probe, True, error
+    return normalized_path, normalized_probe, True, None
 
 
 def _download_options(url: str, tmpdir: str, format_selector: str) -> dict:
@@ -375,11 +520,17 @@ def api_download(
             "Der Download-Ordner ist nicht beschreibbar.",
             str(output_status.get("error") or ""),
         )
-    if not shutil.which("ffmpeg"):
+    if not _ffmpeg_path():
         return _missing_prerequisite_response(
             request_id,
             "ffmpeg wurde nicht gefunden. Bitte installiere ffmpeg und starte den Server neu.",
             "Windows: winget install Gyan.FFmpeg oder choco install ffmpeg. macOS: brew install ffmpeg.",
+        )
+    if not _ffprobe_path():
+        return _missing_prerequisite_response(
+            request_id,
+            "ffprobe wurde nicht gefunden. Bitte installiere ffmpeg vollständig und starte den Server neu.",
+            "ffprobe ist Teil von ffmpeg und wird benötigt, um die finale Videodatei zu prüfen.",
         )
 
     requested_quality = quality if quality is not None else height
@@ -420,7 +571,18 @@ def api_download(
         )
         return _download_error_response(request_id, exception_type=exc_type, detail=exc_msg)
 
-    path = _select_downloaded_video_file(tmpdir)
+    tmpdir_files = _list_tmpdir_files(tmpdir)
+    logger.info(
+        "download_tmpdir_files request_id=%s files=%s",
+        request_id,
+        tmpdir_files,
+    )
+    path, probe = _select_downloaded_video_file(tmpdir)
+    logger.info(
+        "download_ffprobe_selected request_id=%s probe=%s",
+        request_id,
+        probe,
+    )
     if not path:
         shutil.rmtree(tmpdir, ignore_errors=True)
         logger.error(
@@ -441,12 +603,46 @@ def api_download(
             ),
         )
 
+    final_path, final_probe, normalized, normalize_error = _finalize_ios_video_file(path, probe or {}, tmpdir)
+    logger.info(
+        "download_normalization request_id=%s normalized=%s error=%s final_probe=%s",
+        request_id,
+        normalized,
+        normalize_error,
+        final_probe,
+    )
+    if not final_path or not final_probe or not final_probe.get("valid"):
+        shutil.rmtree(tmpdir, ignore_errors=True)
+        logger.error(
+            "download_failed request_id=%s url=%s quality=%s selector=%s yt_dlp=%s "
+            "extractor=unknown phase=validation exception_type=InvalidFinalVideo "
+            "message=%s",
+            request_id,
+            _safe_url(url),
+            requested_quality,
+            format_selector,
+            YT_DLP_VERSION,
+            normalize_error or "final_file_failed_ffprobe_validation",
+        )
+        return _download_error_response(
+            request_id,
+            exception_type="InvalidFinalVideo",
+            detail="Die erzeugte Datei enthält keinen abspielbaren iOS-kompatiblen Video-Track.",
+        )
+
     title = info.get("title") or "video"
-    source_path = Path(path)
-    output_path = _unique_output_path(title, source_path.suffix or ".mp4")
+    source_path = Path(final_path)
+    output_path = _unique_output_path(title, ".mp4")
     shutil.move(str(source_path), output_path)
     shutil.rmtree(tmpdir, ignore_errors=True)
     safe_title = _safe_filename(title)
+    logger.info(
+        "download_ready request_id=%s filename=%s size=%s normalized=%s",
+        request_id,
+        output_path.name,
+        output_path.stat().st_size,
+        normalized,
+    )
 
     return FileResponse(
         output_path,
