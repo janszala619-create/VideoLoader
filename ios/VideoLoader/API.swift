@@ -136,7 +136,7 @@ struct ServerAPI {
             debugRequest(
                 endpoint: endpoint,
                 endpointName: "/api/download",
-                queryNames: query.map(\.name),
+                queryNames: query.map { $0.name },
                 quality: quality
             )
             return endpoint
@@ -224,7 +224,8 @@ struct ServerAPI {
         #if DEBUG
         let base = (try? normalizedBase())?.url?.absoluteString ?? baseURL
         print("[VideoLoader] activeServer=\(kind.rawValue) baseURL=\(base)")
-        print("[VideoLoader] \(endpointName) host=\(endpoint.host ?? "-") port=\(endpoint.port.map(String.init) ?? "-") query=\(queryNames.joined(separator: ","))")
+        let port = endpoint.port.map { String($0) } ?? "-"
+        print("[VideoLoader] \(endpointName) host=\(endpoint.host ?? "-") port=\(port) query=\(queryNames.joined(separator: ","))")
         if let quality {
             print("[VideoLoader] selectedQuality id=\(quality.id) label=\(quality.label) height=\(quality.height.map(String.init) ?? "nil") formatId=\(quality.formatId ?? "nil")")
         }

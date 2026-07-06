@@ -8,7 +8,7 @@ struct ContentView: View {
     private static let defaultLocalServerURL = "http://100.80.105.62:9876"
     private static let invalidVideoInputMessage = "Bitte gib einen YouTube-Link ins Linkfeld ein. Die Server-Adresse gehört in die Einstellungen."
 
-    @AppStorage("serverURL_videoLoader") private var macServerURL = Self.defaultLocalServerURL
+    @AppStorage("serverURL_videoLoader") private var macServerURL = "http://100.80.105.62:9876"
     @AppStorage("serverURL_vidSave") private var cloudServerURL = "http://158.101.168.11:8765"
     @AppStorage("activeServer") private var activeServerRaw = ServerKind.videoLoader.rawValue
     @AppStorage("didMigrateToLocalServer8765") private var didMigrateToLocalServer = false

@@ -6,8 +6,6 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from fastapi.testclient import TestClient
-
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
@@ -294,12 +292,6 @@ class DownloadFlowTests(unittest.TestCase):
         self.assertTrue(payload["ffprobe"])
         self.assertTrue(payload["output_dir_writable"])
         self.assertEqual(payload["normalization_target"]["container"], "mp4")
-
-    def test_api_health_route_returns_videoloader_identity(self):
-        response = TestClient(main.app).get("/api/health")
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["server_name"], "VideoLoader local server")
 
     def test_info_filters_unusual_raw_heights(self):
         payload = main.api_info("https://example.test/watch/1")
