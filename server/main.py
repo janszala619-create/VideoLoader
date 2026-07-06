@@ -27,7 +27,12 @@ def root():
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "yt_dlp": YT_DLP_VERSION}
+    return {
+        "status": "ok",
+        "yt_dlp": YT_DLP_VERSION,
+        "ffmpeg": bool(_FFMPEG_PATH),
+        "aria2c": bool(_ARIA2C_PATH),
+    }
 
 
 def _safe_url(url: str, max_length: int = 160) -> str:
@@ -137,10 +142,28 @@ def api_info(url: str = Query(..., description="Link zum Video")):
 
 def _format_selector(quality: int | None) -> str:
     h = f"[height<={quality}]" if quality else ""
-    return f"best{h}[ext=mp4]/best{h}/bestvideo{h}+bestaudio/best"
+    # Getrennte Video+Audio-Streams zuerst (liefern 720p/1080p auf YouTube).
+    # H.264 (avc1) ist auf iPhone nativ decodierbar; m4a Audio fügt sich sauber
+    # in MP4 ein. Fallback auf kombinierte Streams falls ffmpeg fehlt.
+    return (
+        f"bestvideo{h}[vcodec^=avc1][ext=mp4]+bestaudio[ext=m4a]/"
+        f"bestvideo{h}[vcodec^=avc1]+bestaudio/"
+        f"bestvideo{h}[ext=mp4]+bestaudio[ext=m4a]/"
+        f"bestvideo{h}+bestaudio/"
+        f"best{h}[ext=mp4]/"
+        f"best{h}/"
+        f"best"
+    )
 
 
 _ARIA2C_PATH = shutil.which("aria2c")
+_FFMPEG_PATH = shutil.which("ffmpeg")
+
+if not _FFMPEG_PATH:
+    logger.warning(
+        "ffmpeg nicht gefunden – getrennte Video+Audio-Streams (720p/1080p) "
+        "können nicht zusammengeführt werden. Bitte 'brew install ffmpeg' ausführen."
+    )
 
 
 def _download_options(url: str, tmpdir: str, format_selector: str) -> dict:
@@ -158,6 +181,8 @@ def _download_options(url: str, tmpdir: str, format_selector: str) -> dict:
         "file_access_retries": 3,
         "socket_timeout": 30,
     })
+    if _FFMPEG_PATH:
+        opts["ffmpeg_location"] = os.path.dirname(_FFMPEG_PATH)
     if _ARIA2C_PATH:
         # Für normale (nicht fragmentierte) Downloads nutzt aria2c mehrere
         # parallele Verbindungen zur Quelle statt nur einer – oft der größte
