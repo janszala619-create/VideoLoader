@@ -16,12 +16,12 @@ struct VideoLoaderApp: App {
     var body: some Scene {
         WindowGroup {
             TabView(selection: $selectedTab) {
-                ContentViewPremium(pendingLink: $pendingLink)
+                ContentView(pendingLink: $pendingLink)
                     .tabItem {
                         Label("Laden", systemImage: "arrow.down.circle.fill")
                     }
                     .tag(0)
-                QueueViewPremium()
+                QueueView()
                     .tabItem {
                         Label("Downloads", systemImage: "square.and.arrow.down.fill")
                     }
