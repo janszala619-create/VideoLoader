@@ -4,7 +4,9 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
+
+from fastapi.testclient import TestClient
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -242,6 +244,22 @@ class DownloadFlowTests(unittest.TestCase):
         self.assertEqual(payload["error"]["phase"], "validation")
         self.assertEqual(FakeYoutubeDL.calls, [])
 
+    def test_info_rejects_health_url_as_video_url(self):
+        response = main.api_info("http://100.80.105.62:9876/api/health")
+        payload = json.loads(response.body)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(payload["error"]["code"], "INVALID_VIDEO_URL")
+        self.assertEqual(FakeYoutubeDL.calls, [])
+
+    def test_download_rejects_server_url_before_ytdlp(self):
+        response = main.api_download("http://100.80.105.62:9876/api/health", quality=720)
+        payload = json.loads(response.body)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(payload["error"]["code"], "INVALID_VIDEO_URL")
+        self.assertEqual(FakeYoutubeDL.calls, [])
+
     def test_download_requires_ffmpeg_with_clear_error(self):
         with patch.object(main.shutil, "which", return_value=None):
             response = main.api_download("https://example.test/watch/1", quality=720)
@@ -265,12 +283,23 @@ class DownloadFlowTests(unittest.TestCase):
         self.assertIn("ffprobe", payload["error"]["message"])
 
     def test_health_reports_diagnostics(self):
-        payload = main.health()
+        request = Mock()
+        request.url.port = 9876
+        payload = main.health(request)
 
         self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["server_name"], "VideoLoader local server")
+        self.assertEqual(payload["port"], 9876)
         self.assertTrue(payload["ffmpeg"])
         self.assertTrue(payload["ffprobe"])
         self.assertTrue(payload["output_dir_writable"])
+        self.assertEqual(payload["normalization_target"]["container"], "mp4")
+
+    def test_api_health_route_returns_videoloader_identity(self):
+        response = TestClient(main.app).get("/api/health")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["server_name"], "VideoLoader local server")
 
     def test_info_filters_unusual_raw_heights(self):
         payload = main.api_info("https://example.test/watch/1")

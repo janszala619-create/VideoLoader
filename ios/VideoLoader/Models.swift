@@ -17,9 +17,9 @@ enum ServerKind: String, CaseIterable, Identifiable {
     var settingsHint: String {
         switch self {
         case .videoLoader:
-            return "Läuft lokal bei dir, z. B. auf Mac oder Windows unter Port 8765. Zuverlässiger für YouTube als der Cloud-Server."
+            return "Läuft lokal bei dir, z. B. auf Mac oder Windows unter Port 9876. Zuverlässiger für YouTube als der Cloud-Server."
         case .vidSave:
-            return "Läuft in der Cloud, überall erreichbar. YouTube & viele große Seiten sind hier oft blockiert."
+            return "Legacy/optional: läuft in der Cloud, überall erreichbar. YouTube & viele große Seiten sind hier oft blockiert."
         }
     }
 }

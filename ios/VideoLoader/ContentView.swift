@@ -5,11 +5,15 @@ struct ContentView: View {
     @Binding var pendingLink: String?
     @Environment(\.scenePhase) private var scenePhase
 
-    @AppStorage("serverURL_videoLoader") private var macServerURL = ""
+    private static let defaultLocalServerURL = "http://100.80.105.62:9876"
+    private static let invalidVideoInputMessage = "Bitte gib einen YouTube-Link ins Linkfeld ein. Die Server-Adresse gehört in die Einstellungen."
+
+    @AppStorage("serverURL_videoLoader") private var macServerURL = Self.defaultLocalServerURL
     @AppStorage("serverURL_vidSave") private var cloudServerURL = "http://158.101.168.11:8765"
     @AppStorage("activeServer") private var activeServerRaw = ServerKind.videoLoader.rawValue
     @AppStorage("didMigrateToLocalServer8765") private var didMigrateToLocalServer = false
     @AppStorage("didMigrateToWindowsLocalServer8765") private var didMigrateToWindowsLocalServer = false
+    @AppStorage("didMigrateToLocalServer9876") private var didMigrateToLocalServer9876 = false
 
     @State private var clipboardHasLink = false
     @State private var videoLink = ""
@@ -102,6 +106,9 @@ struct ContentView: View {
             }
             .onAppear {
                 if !didMigrateToLocalServer {
+                    if macServerURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        macServerURL = Self.defaultLocalServerURL
+                    }
                     activeServerRaw = ServerKind.videoLoader.rawValue
                     didMigrateToLocalServer = true
                 }
@@ -110,12 +117,18 @@ struct ContentView: View {
                     if currentLocalURL == "http://192.168.1.23:8000" ||
                         currentLocalURL == "http://100.80.105.62:8765" ||
                         currentLocalURL == cloudServerURL.trimmingCharacters(in: .whitespacesAndNewlines) {
-                        macServerURL = ""
+                        macServerURL = Self.defaultLocalServerURL
                     }
                     activeServerRaw = ServerKind.videoLoader.rawValue
                     didMigrateToWindowsLocalServer = true
                 }
+                if !didMigrateToLocalServer9876 {
+                    migrateLocalServerURLTo9876IfNeeded()
+                    activeServerRaw = ServerKind.videoLoader.rawValue
+                    didMigrateToLocalServer9876 = true
+                }
                 if activeBaseURL.isEmpty { showSettings = true }
+                logActiveServer()
                 Task { await checkServer() }
                 consumePendingLink()
                 detectClipboardLink()
@@ -144,6 +157,7 @@ struct ContentView: View {
             .onChange(of: activeServerRaw) { _, _ in
                 info = nil
                 errorMessage = nil
+                logActiveServer()
                 Task { await checkServer() }
             }
 
@@ -400,6 +414,7 @@ struct ContentView: View {
         info = nil
         justQueuedTitle = nil
         errorMessage = nil
+        guard validateVideoInput() else { return }
         isLoadingInfo = true
         defer { isLoadingInfo = false }
         do {
@@ -416,6 +431,7 @@ struct ContentView: View {
 
     private func enqueueDownload() {
         do {
+            guard validateVideoInput() else { return }
             let api = ServerAPI(kind: activeServer, baseURL: activeBaseURL)
             let url = try api.downloadURL(for: cleanedLink, quality: selectedQuality)
             let fallback = try? api.downloadURL(for: cleanedLink, quality: nil)
@@ -439,6 +455,69 @@ struct ContentView: View {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    private func validateVideoInput() -> Bool {
+        let lowercased = cleanedLink.lowercased()
+        if lowercased.contains("/api/health") ||
+            lowercased.contains("/api/info") ||
+            lowercased.contains("/api/download") ||
+            lowercased.hasSuffix("/health") {
+            errorMessage = Self.invalidVideoInputMessage
+            return false
+        }
+        guard let videoHost = URLComponents(string: cleanedLink)?.host?.lowercased(),
+              let baseHost = Self.host(fromServerURL: activeBaseURL) else {
+            return true
+        }
+        if videoHost == baseHost {
+            errorMessage = Self.invalidVideoInputMessage
+            return false
+        }
+        return true
+    }
+
+    private func migrateLocalServerURLTo9876IfNeeded() {
+        let current = macServerURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        var lowercased = current.lowercased()
+        while lowercased.hasSuffix("/") {
+            lowercased.removeLast()
+        }
+        let knownBadValues: Set<String> = [
+            "",
+            "http://158.101.168.11:8765",
+            "http://100.80.105.62:8765",
+            "/api/health",
+        ]
+        if knownBadValues.contains(current) ||
+            lowercased.contains("/api/health") ||
+            lowercased.contains("/api/info") ||
+            lowercased.contains("/api/download") ||
+            lowercased.contains("youtube.com") ||
+            lowercased.contains("youtu.be") {
+            macServerURL = Self.defaultLocalServerURL
+        }
+    }
+
+    private static func host(fromServerURL serverURL: String) -> String? {
+        var trimmed = serverURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        if !trimmed.lowercased().hasPrefix("http") {
+            trimmed = "http://\(trimmed)"
+        }
+        return URLComponents(string: trimmed)?.host?.lowercased()
+    }
+
+    private func logActiveServer() {
+        #if DEBUG
+        let resolved = activeServer
+        let baseURL = activeBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalized = baseURL.hasPrefix("http") ? baseURL : "http://\(baseURL)"
+        print("[VideoLoader] activeServerRaw=\(activeServerRaw) resolvedServer=\(resolved.rawValue) activeBaseURL=\(baseURL) normalizedBase=\(normalized)")
+        if resolved == .vidSave {
+            print("[VideoLoader] warning=VidSave legacy server mode is active")
+        }
+        #endif
     }
 }
 

@@ -11,8 +11,8 @@ Die App besteht aus zwei Teilen:
 
 Die App kann zwei verschiedene Server ansprechen; oben wählst du per Schalter aus:
 
-- **Cloud-Server** (Standard, Adresse `http://158.101.168.11:8765`): überall erreichbar, du brauchst keinen Mac laufen zu lassen. **Aber:** YouTube, Vimeo und viele große Seiten blockieren diesen Server, weil er in einem Rechenzentrum steht (getestet am 04.07.2026). Gut geeignet für Seiten, die Cloud-Server durchlassen.
-- **Mac-Server** (der Server in `server/`): läuft bei dir zu Hause und wird von YouTube **nicht** blockiert – die zuverlässige Wahl, besonders für YouTube. Dafür muss der Mac an und im selben WLAN sein.
+- **Lokaler Server** (Standard, z. B. `http://100.80.105.62:9876`): läuft bei dir zu Hause und wird von YouTube **nicht** blockiert – die zuverlässige Wahl, besonders für YouTube.
+- **Cloud-Server / VidSave** (Legacy, Adresse `http://158.101.168.11:8765`): überall erreichbar, aber YouTube, Vimeo und viele große Seiten blockieren diesen Server häufig.
 
 > **Wichtig:** Nur für den privaten Gebrauch. Lade nur Videos herunter, zu deren Download du berechtigt bist. Solche Apps sind im App Store nicht erlaubt – die Installation erfolgt direkt über Xcode auf dein eigenes iPhone.
 
@@ -42,30 +42,30 @@ Kopiere den kompletten Ordner `VideoLoader` auf deinen Mac (z. B. per USB-Stick,
    macOS/Linux:
    ```bash
    cd /Pfad/zum/VideoLoader/server
-   chmod +x start.sh
-   ./start.sh
+   VIDEOLOADER_LOG_LEVEL=DEBUG python -m uvicorn main:app --host 0.0.0.0 --port 9876 --log-level debug
    ```
 
    Windows PowerShell:
    ```powershell
    cd C:\Pfad\zum\VideoLoader\server
-   .\start.ps1
+   $env:VIDEOLOADER_LOG_LEVEL="DEBUG"
+   python -m uvicorn main:app --host 0.0.0.0 --port 9876 --log-level debug
    ```
 
    Beim ersten Start richtet das Skript alles automatisch ein. Danach zeigt es dir die Adresse an, z. B.:
    ```
    Server startet. Diese Adresse in der App eintragen:
-     http://192.168.1.23:8765
+     http://100.80.105.62:9876
    ```
    **Diese Adresse brauchst du gleich in der App.** Lass das Terminal-Fenster offen, solange du die App benutzt.
 
 3. **Server prüfen.** Öffne im Browser:
    ```text
-   http://192.168.1.23:8765/health
+   http://100.80.105.62:9876/api/health
    ```
    Für eine ausführlichere Diagnose:
    ```text
-   http://192.168.1.23:8765/api/diagnostics
+   http://100.80.105.62:9876/api/diagnostics
    ```
    Dort siehst du, ob der Download-Ordner beschreibbar ist und ob `ffmpeg`, `ffprobe` und `yt-dlp` gefunden werden.
 
@@ -84,7 +84,7 @@ Kopiere den kompletten Ordner `VideoLoader` auf deinen Mac (z. B. per USB-Stick,
 
 ## Schritt 4: App benutzen
 
-1. Beim ersten Start öffnen sich die **Einstellungen**: Trage dort die Server-Adresse aus Schritt 2 ein (z. B. `http://192.168.1.23:8765`). iPhone und Computer müssen im **selben WLAN** sein.
+1. Beim ersten Start öffnen sich die **Einstellungen**: Trage dort die Server-Adresse aus Schritt 2 ein (z. B. `http://100.80.105.62:9876`). iPhone und Computer müssen im selben WLAN oder Tailscale-Netz sein.
 2. Video-Link kopieren (z. B. über „Teilen → Kopieren“ in der YouTube-App), in der App einfügen und **„Video prüfen“** tippen.
 3. Vorschau ansehen (▶ auf dem Vorschaubild), **Qualität wählen** und **„Herunterladen“** tippen.
 4. Das Video erscheint im Tab **„Meine Videos“**: Antippen zum Abspielen, Teilen-Symbol zum Weitergeben, Foto-Symbol zum Sichern in die **Fotos-Galerie** (beim ersten Mal fragt iOS nach Erlaubnis – erlauben). Wischen nach links löscht ein Video.
@@ -93,8 +93,29 @@ Kopiere den kompletten Ordner `VideoLoader` auf deinen Mac (z. B. per USB-Stick,
 
 ## Häufige Probleme
 
-- **„Server nicht erreichbar“** – Läuft `start.sh` oder `start.ps1` noch? Sind iPhone und Computer im selben WLAN? Stimmt die Adresse (inkl. `:8765`)?
+- **„Server nicht erreichbar“** – Läuft der lokale Server noch? Sind iPhone und Computer im selben WLAN oder Tailscale-Netz? Stimmt die Adresse (inkl. `:9876`)?
 - **„ffmpeg wurde nicht gefunden“** – Installiere `ffmpeg` wie oben beschrieben und starte danach Terminal/PowerShell und den Server neu.
 - **YouTube-Video schlägt fehl** – yt-dlp muss aktuell sein. Einfach den Server neu starten (`./start.sh` aktualisiert yt-dlp automatisch).
-- **Unterwegs nutzen (nicht im Heim-WLAN)** – Installiere [Tailscale](https://tailscale.com) (kostenlos) auf Computer und iPhone; trage dann in der App die Tailscale-Adresse des Computers ein (z. B. `http://100.x.y.z:8765`).
+- **Unterwegs nutzen (nicht im Heim-WLAN)** – Installiere [Tailscale](https://tailscale.com) (kostenlos) auf Computer und iPhone; trage dann in der App die Tailscale-Adresse des Computers ein (z. B. `http://100.x.y.z:9876`).
 - **Server in der Cloud statt auf dem Mac?** – Möglich (der `server/`-Ordner läuft überall, wo Python + ffmpeg vorhanden sind), aber Achtung: YouTube blockiert Rechenzentrums-IP-Adressen häufig. Der Server zu Hause auf dem Mac ist am zuverlässigsten.
+
+### Diagnose: richtiger Server und Ports
+
+Der lokale VideoLoader-Server meldet sich unter:
+
+```text
+http://TAILSCALE_IP:9876/api/health
+```
+
+Die Antwort muss `server_name: "VideoLoader local server"` enthalten. Verwende in der App nur die Basisadresse `http://TAILSCALE_IP:9876`, nicht `/api/health`, nicht `localhost`, nicht `127.0.0.1` und keinen YouTube-Link.
+
+Falls noch ein alter VidSave-Prozess auf Port 8765 läuft:
+
+```powershell
+netstat -ano | findstr :8765
+netstat -ano | findstr :9876
+Get-Process -Id <PID>
+Stop-Process -Id <PID> -Force
+```
+
+Korrekte Server-Logs enthalten `VideoLoader /api/info`, `VideoLoader /api/download`, `quality=` und `ffprobe`. Wenn Logs `vidsave.server`, `info_requested` oder `download_requested` zeigen, trifft die App noch den alten VidSave-Server oder den falschen Port.

@@ -13,7 +13,7 @@ from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
 
 import yt_dlp
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from fastapi.responses import FileResponse
 from yt_dlp.version import __version__ as YT_DLP_VERSION
@@ -24,6 +24,13 @@ logging.basicConfig(level=os.getenv("VIDEOLOADER_LOG_LEVEL", "INFO").upper())
 
 SERVER_DIR = Path(__file__).resolve().parent
 OUTPUT_DIR = Path(os.getenv("VIDEOLOADER_OUTPUT_DIR", SERVER_DIR / "downloads")).resolve()
+_NORMALIZATION_TARGET = {
+    "container": "mp4",
+    "video_codec": "h264",
+    "pixel_format": "yuv420p",
+    "audio_codec": "aac",
+    "faststart": True,
+}
 
 
 @app.get("/")
@@ -32,25 +39,41 @@ def root():
 
 
 @app.get("/health")
-def health():
+def health(request: Request = None):
     diagnostics = _diagnostics()
+    port = request.url.port if request is not None else None
     required_ok = (
         diagnostics["output_dir"]["writable"]
         and diagnostics["ffmpeg"]["available"]
         and diagnostics["ffprobe"]["available"]
     )
-    return {
+    payload = {
         "status": "ok" if required_ok else "degraded",
+        "server_name": "VideoLoader local server",
+        "port": port,
         "yt_dlp": YT_DLP_VERSION,
         "ffmpeg": diagnostics["ffmpeg"]["available"],
+        "ffmpeg_path": diagnostics["ffmpeg"]["path"],
         "ffprobe": diagnostics["ffprobe"]["available"],
+        "ffprobe_path": diagnostics["ffprobe"]["path"],
+        "output_dir": diagnostics["output_dir"]["path"],
         "output_dir_writable": diagnostics["output_dir"]["writable"],
+        "normalization_target": _NORMALIZATION_TARGET,
     }
+    logger.info(
+        "VideoLoader /api/health requested port=%s yt_dlp=%s ffmpeg=%s ffprobe=%s output_dir=%s",
+        port,
+        YT_DLP_VERSION,
+        diagnostics["ffmpeg"]["path"] or "missing",
+        diagnostics["ffprobe"]["path"] or "missing",
+        diagnostics["output_dir"]["path"],
+    )
+    return payload
 
 
 @app.get("/api/health")
-def api_health():
-    return health()
+def api_health(request: Request):
+    return health(request)
 
 
 @app.get("/api/diagnostics")
@@ -109,6 +132,32 @@ def _validate_video_url(url: str) -> str:
     if parts.scheme not in {"http", "https"} or not parts.netloc:
         raise HTTPException(status_code=400, detail="Bitte gib einen gültigen http- oder https-Link ein.")
     return trimmed
+
+
+def _invalid_video_url_response(request_id: str | None = None):
+    return JSONResponse(
+        status_code=400,
+        content={
+            "error": {
+                "code": "INVALID_VIDEO_URL",
+                "message": "Bitte gib einen YouTube-Link ins Linkfeld ein. Die Server-Adresse gehört in die Einstellungen.",
+                "phase": "validation",
+                "request_id": request_id,
+            }
+        },
+    )
+
+
+def _is_server_api_url(url: str, request: Request | None = None) -> bool:
+    parts = urlsplit(url or "")
+    path = parts.path.lower()
+    if path in {"/health", "/api/health", "/api/info", "/api/download"}:
+        return True
+    if path.startswith("/api/"):
+        return True
+    if request is not None and parts.netloc and parts.netloc.lower() == request.url.netloc.lower():
+        return True
+    return False
 
 
 def _missing_prerequisite_response(request_id: str, message: str, detail: str | None = None):
@@ -192,7 +241,14 @@ def _extract_info(url: str) -> dict:
 
 
 @app.get("/api/info")
-def api_info(url: str = Query(..., description="Link zum Video")):
+def api_info(
+    url: str,
+    request: Request = None,
+):
+    if _is_server_api_url(url, request):
+        logger.warning("VideoLoader /api/info rejected_server_url url=%s", _safe_url(url))
+        return _invalid_video_url_response()
+    logger.info("VideoLoader /api/info requested url=%s", _safe_url(url))
     try:
         info = _extract_info(url)
     except HTTPException:
@@ -493,12 +549,20 @@ def _download_error_response(
 
 @app.get("/api/download")
 def api_download(
-    url: str = Query(..., description="Link zum Video"),
-    height: int | None = Query(None, description="Maximale Auflösung, z. B. 1080"),
-    quality: int | None = Query(None, description="Maximale Auflösung, z. B. 1080"),
-    format_id: str | None = Query(None, description="yt-dlp Format-Selektor"),
+    url: str,
+    height: int | None = None,
+    quality: int | None = None,
+    format_id: str | None = None,
+    request: Request = None,
 ):
     request_id = uuid.uuid4().hex[:12]
+    if _is_server_api_url(url, request):
+        logger.warning(
+            "VideoLoader /api/download rejected_server_url request_id=%s url=%s",
+            request_id,
+            _safe_url(url),
+        )
+        return _invalid_video_url_response(request_id)
     try:
         url = _validate_video_url(url)
     except HTTPException as exc:
@@ -542,11 +606,26 @@ def api_download(
     tmpdir = tempfile.mkdtemp(prefix="videoloader_")
     try:
         logger.info(
-            "download_start request_id=%s url=%s quality=%s selector=%s yt_dlp=%s phase=download",
+            "VideoLoader /api/download requested request_id=%s url=%s quality=%s height=%s format_id=%s selector=%s yt_dlp=%s phase=download",
+            request_id,
+            _safe_url(url),
+            quality,
+            height,
+            format_id,
+            format_selector,
+            YT_DLP_VERSION,
+        )
+        logger.info(
+            "VideoLoader normalization_target=%s normalization_performed=false",
+            _NORMALIZATION_TARGET,
+        )
+        logger.info(
+            "download_start request_id=%s url=%s quality=%s selector=%s final_output_template=%s yt_dlp=%s phase=download",
             request_id,
             _safe_url(url),
             requested_quality,
             format_selector,
+            os.path.join(tmpdir, "video.%(ext)s"),
             YT_DLP_VERSION,
         )
         opts = _download_options(url, tmpdir, format_selector)

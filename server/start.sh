@@ -51,7 +51,7 @@ fi
 echo ""
 echo "Server startet. Diese Adresse in der App eintragen:"
 IP=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null)
-PORT="${PORT:-8765}"
+PORT="${PORT:-9876}"
 echo "  http://${IP:-<Mac-IP-Adresse>}:$PORT"
 echo ""
-./.venv/bin/uvicorn main:app --host 0.0.0.0 --port "$PORT"
+VIDEOLOADER_LOG_LEVEL="${VIDEOLOADER_LOG_LEVEL:-DEBUG}" ./.venv/bin/uvicorn main:app --host 0.0.0.0 --port "$PORT" --log-level debug

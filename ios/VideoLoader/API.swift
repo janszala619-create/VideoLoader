@@ -24,6 +24,8 @@ struct ServerAPI {
     let kind: ServerKind
     let baseURL: String
 
+    private static let videoURLInServerFieldMessage = "Bitte gib einen YouTube-Link ins Linkfeld ein. Die Server-Adresse gehört in die Einstellungen."
+
     private static let session: URLSession = {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 120
@@ -39,6 +41,9 @@ struct ServerAPI {
             trimmed = "http://" + trimmed
         }
         guard let components = URLComponents(string: trimmed) else { throw APIError.badURL }
+        if Self.containsServerAPIPath(components.path) || Self.looksLikeVideoURL(trimmed) {
+            throw APIError.server(Self.videoURLInServerFieldMessage)
+        }
         return components
     }
 
@@ -53,6 +58,7 @@ struct ServerAPI {
     // MARK: - Infos holen
 
     func fetchInfo(for videoURL: String) async throws -> VideoInfo {
+        try validateVideoURL(videoURL)
         switch kind {
         case .videoLoader: return try await fetchInfoVideoLoader(videoURL)
         case .vidSave: return try await fetchInfoVidSave(videoURL)
@@ -61,6 +67,7 @@ struct ServerAPI {
 
     private func fetchInfoVideoLoader(_ videoURL: String) async throws -> VideoInfo {
         let endpoint = try url(path: "/api/info", query: [URLQueryItem(name: "url", value: videoURL)])
+        debugRequest(endpoint: endpoint, endpointName: "/api/info", queryNames: ["url"], quality: nil)
         let (data, response) = try await get(endpoint)
         try Self.checkStatus(response: response, data: data)
 
@@ -92,6 +99,7 @@ struct ServerAPI {
 
     private func fetchInfoVidSave(_ videoURL: String) async throws -> VideoInfo {
         let endpoint = try url(path: "/api/info")
+        debugRequest(endpoint: endpoint, endpointName: "/api/info", queryNames: ["body.url"], quality: nil)
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -117,20 +125,33 @@ struct ServerAPI {
     // MARK: - Download-Adresse
 
     func downloadURL(for videoURL: String, quality: QualityOption?) throws -> URL {
+        try validateVideoURL(videoURL)
         switch kind {
         case .videoLoader:
             var query = [URLQueryItem(name: "url", value: videoURL)]
-            if quality?.formatId != nil {
-                query.append(URLQueryItem(name: "format_id", value: Self.vidSaveDownloadSelector(for: quality)))
-            } else if let height = quality?.height {
+            if let height = quality?.height {
                 query.append(URLQueryItem(name: "quality", value: String(height)))
             }
-            return try url(path: "/api/download", query: query)
+            let endpoint = try url(path: "/api/download", query: query)
+            debugRequest(
+                endpoint: endpoint,
+                endpointName: "/api/download",
+                queryNames: query.map(\.name),
+                quality: quality
+            )
+            return endpoint
         case .vidSave:
-            return try url(path: "/api/download", query: [
+            let endpoint = try url(path: "/api/download", query: [
                 URLQueryItem(name: "url", value: videoURL),
                 URLQueryItem(name: "format_id", value: Self.vidSaveDownloadSelector(for: quality)),
             ])
+            debugRequest(
+                endpoint: endpoint,
+                endpointName: "/api/download",
+                queryNames: ["url", "format_id"],
+                quality: quality
+            )
+            return endpoint
         }
     }
 
@@ -141,7 +162,7 @@ struct ServerAPI {
     func isReachable() async -> Bool {
         var components: URLComponents
         do { components = try normalizedBase() } catch { return false }
-        components.path = "/health"
+        components.path = kind == .videoLoader ? "/api/health" : "/health"
         guard let healthURL = components.url else { return false }
 
         var request = URLRequest(url: healthURL)
@@ -158,6 +179,60 @@ struct ServerAPI {
     }
 
     // MARK: - Hilfen
+
+    private func validateVideoURL(_ videoURL: String) throws {
+        let trimmed = videoURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { throw APIError.badURL }
+        if Self.containsServerAPIPath(trimmed) {
+            throw APIError.server(Self.videoURLInServerFieldMessage)
+        }
+
+        guard let videoComponents = URLComponents(string: trimmed),
+              let videoHost = videoComponents.host?.lowercased() else {
+            throw APIError.badURL
+        }
+        let baseComponents = try normalizedBase()
+        if let baseHost = baseComponents.host?.lowercased(), videoHost == baseHost {
+            throw APIError.server(Self.videoURLInServerFieldMessage)
+        }
+        guard Self.looksLikeVideoURL(trimmed) else { throw APIError.badURL }
+    }
+
+    private static func containsServerAPIPath(_ text: String) -> Bool {
+        let lowercased = text.lowercased()
+        return lowercased.contains("/api/health") ||
+            lowercased.contains("/api/info") ||
+            lowercased.contains("/api/download") ||
+            lowercased == "/health" ||
+            lowercased.hasSuffix("/health")
+    }
+
+    private static func looksLikeVideoURL(_ text: String) -> Bool {
+        guard let host = URLComponents(string: text).host?.lowercased() else { return false }
+        return host.contains("youtube.com") ||
+            host.contains("youtu.be") ||
+            host.contains("music.youtube.com") ||
+            host.contains("m.youtube.com")
+    }
+
+    private func debugRequest(
+        endpoint: URL,
+        endpointName: String,
+        queryNames: [String],
+        quality: QualityOption?
+    ) {
+        #if DEBUG
+        let base = (try? normalizedBase())?.url?.absoluteString ?? baseURL
+        print("[VideoLoader] activeServer=\(kind.rawValue) baseURL=\(base)")
+        print("[VideoLoader] \(endpointName) host=\(endpoint.host ?? "-") port=\(endpoint.port.map(String.init) ?? "-") query=\(queryNames.joined(separator: ","))")
+        if let quality {
+            print("[VideoLoader] selectedQuality id=\(quality.id) label=\(quality.label) height=\(quality.height.map(String.init) ?? "nil") formatId=\(quality.formatId ?? "nil")")
+        }
+        if kind == .vidSave {
+            print("[VideoLoader] warning=VidSave legacy server mode is active")
+        }
+        #endif
+    }
 
     private func get(_ endpoint: URL) async throws -> (Data, URLResponse) {
         do {
