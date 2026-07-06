@@ -2,14 +2,14 @@ import Foundation
 
 /// Welcher Server-Typ gerade benutzt wird. Beide haben unterschiedliche Schnittstellen.
 enum ServerKind: String, CaseIterable, Identifiable {
-    case videoLoader   // der selbst gebaute Server auf dem Mac
+    case videoLoader   // der selbst gehostete VideoLoader-Server
     case vidSave       // der VidSave-Cloud-Server
 
     var id: String { rawValue }
 
     var label: String {
         switch self {
-        case .videoLoader: return "Mac-Server"
+        case .videoLoader: return "Lokaler Server"
         case .vidSave: return "Cloud-Server"
         }
     }
@@ -17,7 +17,7 @@ enum ServerKind: String, CaseIterable, Identifiable {
     var settingsHint: String {
         switch self {
         case .videoLoader:
-            return "Läuft auf deinem Mac (start.sh). Zuverlässig inkl. YouTube, aber Mac muss an sein."
+            return "Läuft lokal bei dir, z. B. unter Windows auf Port 8765. Zuverlässiger für YouTube als der Cloud-Server."
         case .vidSave:
             return "Läuft in der Cloud, überall erreichbar. YouTube & viele große Seiten sind hier oft blockiert."
         }
@@ -25,7 +25,7 @@ enum ServerKind: String, CaseIterable, Identifiable {
 }
 
 /// Eine wählbare Qualitätsstufe – server-neutral. Je nach Server wird `height`
-/// (Mac-Server) oder `formatId` (Cloud-Server) für den Download verwendet.
+/// (lokaler Server) oder `formatId` (Cloud-Server) für den Download verwendet.
 struct QualityOption: Identifiable, Hashable {
     let id: String
     let label: String

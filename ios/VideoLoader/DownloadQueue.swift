@@ -178,10 +178,11 @@ final class DownloadQueue: NSObject, ObservableObject {
             guard let index = self.jobs.firstIndex(where: { $0.id == id }) else { return }
             let job = self.jobs[index]
 
-            // 1) „Format nicht verfügbar“ → einmalig auf beste Qualität ausweichen
-            if message.contains("Requested format is not available"),
+            // 1) Unbrauchbares Format → einmalig auf beste Qualität ausweichen
+            if Self.shouldUseFallback(for: message),
                let fallback = job.fallbackURL, !self.fallbackUsed.contains(id) {
                 self.fallbackUsed.insert(id)
+                self.jobs[index].status = .waiting
                 self.launch(jobAt: index, url: fallback)
                 return
             }
@@ -189,6 +190,7 @@ final class DownloadQueue: NSObject, ObservableObject {
             // 2) Vorübergehende Fehler → bis zu zweimal neu versuchen
             if (self.retriesLeft[id] ?? 0) > 0, Self.isTransient(message) {
                 self.retriesLeft[id] = (self.retriesLeft[id] ?? 0) - 1
+                self.jobs[index].status = .waiting
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                     guard let i = self.jobs.firstIndex(where: { $0.id == id }),
                           self.jobs[i].status == .running || self.jobs[i].status == .waiting else { return }
@@ -206,6 +208,16 @@ final class DownloadQueue: NSObject, ObservableObject {
         let patterns = ["HTTP Error 429", "HTTP Error 5",
                         "timed out", "unable to download",
                         "network connection was lost", "downloaded file is empty"]
+        return patterns.contains { message.localizedCaseInsensitiveContains($0) }
+    }
+
+    private static func shouldUseFallback(for message: String) -> Bool {
+        let patterns = [
+            "Requested format is not available",
+            "keinen abspielbaren Video-Track",
+            "keine gültige Videodatei",
+            "Fehlerantwort statt eines Videos"
+        ]
         return patterns.contains { message.localizedCaseInsensitiveContains($0) }
     }
 

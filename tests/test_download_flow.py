@@ -1,6 +1,7 @@
 import json
 import os
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -73,9 +74,12 @@ class DownloadFlowTests(unittest.TestCase):
         FakeYoutubeDL.calls = []
         FakeYoutubeDL.fail_download = False
         self.patcher = patch.object(main.yt_dlp, "YoutubeDL", FakeYoutubeDL)
+        self.ffprobe_patcher = patch.object(main, "_FFPROBE_PATH", None)
         self.patcher.start()
+        self.ffprobe_patcher.start()
 
     def tearDown(self):
+        self.ffprobe_patcher.stop()
         self.patcher.stop()
 
     def test_720p_download_uses_height_selector(self):
@@ -84,7 +88,13 @@ class DownloadFlowTests(unittest.TestCase):
         self.assertEqual(response.media_type, "video/mp4")
         self.assertEqual(
             FakeYoutubeDL.calls[0]["format"],
-            "best[height<=720][ext=mp4]/best[height<=720]/bestvideo[height<=720]+bestaudio/best",
+            "bestvideo[height<=720][vcodec^=avc1][ext=mp4]+bestaudio[acodec^=mp4a][ext=m4a]/"
+            "bestvideo[height<=720][vcodec^=avc1]+bestaudio[acodec^=mp4a]/"
+            "best[height<=720][vcodec^=avc1][acodec^=mp4a][ext=mp4]/"
+            "best[height<=720][vcodec!=none][acodec!=none][ext=mp4]/"
+            "bestvideo[vcodec^=avc1][ext=mp4]+bestaudio[acodec^=mp4a][ext=m4a]/"
+            "bestvideo[vcodec^=avc1]+bestaudio[acodec^=mp4a]/"
+            "best[vcodec!=none][acodec!=none][ext=mp4]",
         )
         self.assertEqual(FakeYoutubeDL.calls[1]["download"], True)
 
@@ -93,7 +103,13 @@ class DownloadFlowTests(unittest.TestCase):
 
         self.assertEqual(
             FakeYoutubeDL.calls[0]["format"],
-            "best[height<=1080][ext=mp4]/best[height<=1080]/bestvideo[height<=1080]+bestaudio/best",
+            "bestvideo[height<=1080][vcodec^=avc1][ext=mp4]+bestaudio[acodec^=mp4a][ext=m4a]/"
+            "bestvideo[height<=1080][vcodec^=avc1]+bestaudio[acodec^=mp4a]/"
+            "best[height<=1080][vcodec^=avc1][acodec^=mp4a][ext=mp4]/"
+            "best[height<=1080][vcodec!=none][acodec!=none][ext=mp4]/"
+            "bestvideo[vcodec^=avc1][ext=mp4]+bestaudio[acodec^=mp4a][ext=m4a]/"
+            "bestvideo[vcodec^=avc1]+bestaudio[acodec^=mp4a]/"
+            "best[vcodec!=none][acodec!=none][ext=mp4]",
         )
 
     def test_direct_mp4_is_preferred_before_video_audio_merge(self):
@@ -101,8 +117,31 @@ class DownloadFlowTests(unittest.TestCase):
 
         opts = FakeYoutubeDL.calls[0]
         self.assertEqual(opts["merge_output_format"], "mp4")
-        self.assertTrue(opts["format"].startswith("best[height<=1080][ext=mp4]/"))
+        self.assertTrue(opts["format"].startswith("bestvideo[height<=1080][vcodec^=avc1][ext=mp4]+bestaudio"))
         self.assertIn("+bestaudio", opts["format"])
+        self.assertIn("[vcodec!=none][acodec!=none]", opts["format"])
+        self.assertIn("[vcodec^=avc1]", opts["format"])
+        self.assertIn("[acodec^=mp4a]", opts["format"])
+
+    def test_format_id_selector_is_honored_when_present(self):
+        main.api_download(
+            "https://example.test/watch/1",
+            quality=720,
+            format_id="bestvideo[height<=480]+bestaudio",
+        )
+
+        self.assertEqual(FakeYoutubeDL.calls[0]["format"], "bestvideo[height<=480]+bestaudio")
+
+    def test_audio_only_temp_file_is_not_returned_as_video(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            audio_path = os.path.join(tmpdir, "video.m4a")
+            video_path = os.path.join(tmpdir, "video.mp4")
+            with open(audio_path, "wb") as file:
+                file.write(b"a" * 100)
+            with open(video_path, "wb") as file:
+                file.write(b"v" * 10)
+
+            self.assertEqual(main._select_downloaded_video_file(tmpdir), video_path)
 
     def test_fragment_downloads_are_parallelized_for_hls_fallbacks(self):
         main.api_download("https://example.test/watch/1", quality=1080)

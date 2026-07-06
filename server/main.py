@@ -1,9 +1,11 @@
 """VideoLoader-Server: liefert Videoinfos und Downloads über yt-dlp."""
 
+import json
 import logging
 import os
 import re
 import shutil
+import subprocess
 import tempfile
 import traceback
 import uuid
@@ -137,10 +139,70 @@ def api_info(url: str = Query(..., description="Link zum Video")):
 
 def _format_selector(quality: int | None) -> str:
     h = f"[height<={quality}]" if quality else ""
-    return f"best{h}[ext=mp4]/best{h}/bestvideo{h}+bestaudio/best"
+    return "/".join(
+        [
+            f"bestvideo{h}[vcodec^=avc1][ext=mp4]+bestaudio[acodec^=mp4a][ext=m4a]",
+            f"bestvideo{h}[vcodec^=avc1]+bestaudio[acodec^=mp4a]",
+            f"best{h}[vcodec^=avc1][acodec^=mp4a][ext=mp4]",
+            f"best{h}[vcodec!=none][acodec!=none][ext=mp4]",
+            "bestvideo[vcodec^=avc1][ext=mp4]+bestaudio[acodec^=mp4a][ext=m4a]",
+            "bestvideo[vcodec^=avc1]+bestaudio[acodec^=mp4a]",
+            "best[vcodec!=none][acodec!=none][ext=mp4]",
+        ]
+    )
 
 
 _ARIA2C_PATH = shutil.which("aria2c")
+_FFPROBE_PATH = shutil.which("ffprobe")
+_VIDEO_EXTENSIONS = {".mp4", ".m4v", ".mov", ".webm", ".mkv"}
+_AUDIO_EXTENSIONS = {".m4a", ".mp3", ".aac", ".opus", ".ogg", ".weba", ".wav"}
+
+
+def _has_video_track(path: str) -> bool:
+    ext = os.path.splitext(path)[1].lower()
+    if ext in _AUDIO_EXTENSIONS:
+        return False
+    if _FFPROBE_PATH:
+        try:
+            result = subprocess.run(
+                [
+                    _FFPROBE_PATH,
+                    "-v",
+                    "error",
+                    "-show_entries",
+                    "stream=codec_type",
+                    "-of",
+                    "json",
+                    path,
+                ],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=False,
+            )
+            if result.returncode == 0:
+                data = json.loads(result.stdout or "{}")
+                return any(
+                    stream.get("codec_type") == "video"
+                    for stream in data.get("streams", [])
+                )
+        except Exception as exc:
+            logger.warning(
+                "ffprobe_failed path=%s exception_type=%s message=%s",
+                path,
+                type(exc).__name__,
+                exc,
+            )
+    return ext in _VIDEO_EXTENSIONS
+
+
+def _select_downloaded_video_file(tmpdir: str) -> str | None:
+    files = [os.path.join(tmpdir, f) for f in os.listdir(tmpdir)]
+    files = [f for f in files if os.path.isfile(f)]
+    video_files = [f for f in files if _has_video_track(f)]
+    if not video_files:
+        return None
+    return max(video_files, key=os.path.getsize)
 
 
 def _download_options(url: str, tmpdir: str, format_selector: str) -> dict:
@@ -189,10 +251,15 @@ def api_download(
     url: str = Query(..., description="Link zum Video"),
     height: int | None = Query(None, description="Maximale Auflösung, z. B. 1080"),
     quality: int | None = Query(None, description="Maximale Auflösung, z. B. 1080"),
+    format_id: str | None = Query(None, description="yt-dlp Format-Selektor"),
 ):
     request_id = uuid.uuid4().hex[:12]
     requested_quality = quality if quality is not None else height
-    format_selector = _format_selector(requested_quality)
+    format_selector = (
+        format_id.strip()
+        if isinstance(format_id, str) and format_id.strip()
+        else _format_selector(requested_quality)
+    )
     tmpdir = tempfile.mkdtemp(prefix="videoloader_")
     try:
         logger.info(
@@ -223,13 +290,12 @@ def api_download(
         )
         return _download_error_response(request_id)
 
-    files = [os.path.join(tmpdir, f) for f in os.listdir(tmpdir)]
-    files = [f for f in files if os.path.isfile(f)]
-    if not files:
+    path = _select_downloaded_video_file(tmpdir)
+    if not path:
         shutil.rmtree(tmpdir, ignore_errors=True)
         logger.error(
             "download_failed request_id=%s url=%s quality=%s selector=%s yt_dlp=%s "
-            "extractor=unknown phase=download exception_type=MissingOutput message=no_file_created",
+            "extractor=unknown phase=download exception_type=MissingVideoOutput message=no_video_file_created",
             request_id,
             _safe_url(url),
             requested_quality,
@@ -237,7 +303,6 @@ def api_download(
             YT_DLP_VERSION,
         )
         return _download_error_response(request_id)
-    path = max(files, key=os.path.getsize)
 
     title = (info.get("title") or "video")[:80]
     safe_title = "".join(c for c in title if c.isalnum() or c in " -_").strip() or "video"

@@ -9,6 +9,7 @@ struct ContentView: View {
     @AppStorage("serverURL_vidSave") private var cloudServerURL = "http://158.101.168.11:8765"
     @AppStorage("activeServer") private var activeServerRaw = ServerKind.videoLoader.rawValue
     @AppStorage("didMigrateToLocalServer8765") private var didMigrateToLocalServer = false
+    @AppStorage("didMigrateToWindowsLocalServer8765") private var didMigrateToWindowsLocalServer = false
 
     @State private var clipboardHasLink = false
     @State private var videoLink = ""
@@ -24,7 +25,7 @@ struct ContentView: View {
     @ObservedObject private var queue = DownloadQueue.shared
 
     private var activeServer: ServerKind {
-        ServerKind(rawValue: activeServerRaw) ?? .vidSave
+        ServerKind(rawValue: activeServerRaw) ?? .videoLoader
     }
 
     private var activeBaseURL: String {
@@ -106,6 +107,16 @@ struct ContentView: View {
                     }
                     activeServerRaw = ServerKind.videoLoader.rawValue
                     didMigrateToLocalServer = true
+                }
+                if !didMigrateToWindowsLocalServer {
+                    let currentLocalURL = macServerURL.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if currentLocalURL.isEmpty ||
+                        currentLocalURL == "http://192.168.1.23:8000" ||
+                        currentLocalURL == cloudServerURL.trimmingCharacters(in: .whitespacesAndNewlines) {
+                        macServerURL = "http://100.80.105.62:8765"
+                    }
+                    activeServerRaw = ServerKind.videoLoader.rawValue
+                    didMigrateToWindowsLocalServer = true
                 }
                 if activeBaseURL.isEmpty { showSettings = true }
                 Task { await checkServer() }

@@ -236,8 +236,7 @@ struct ServerAPI {
     }
 
     private static func vidSaveDownloadSelector(for quality: QualityOption?) -> String {
-        let limit = quality?.height ?? 1080
-        let h = "[height<=\(limit)]"
+        let h = quality?.height.map { "[height<=\($0)]" } ?? ""
         return [
             "bestvideo\(h)[vcodec^=avc1][ext=mp4]+bestaudio[acodec^=mp4a][ext=m4a]",
             "bestvideo\(h)[vcodec^=avc1]+bestaudio[acodec^=mp4a]",
