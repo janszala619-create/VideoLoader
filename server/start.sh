@@ -51,6 +51,7 @@ fi
 echo ""
 echo "Server startet. Diese Adresse in der App eintragen:"
 IP=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null)
-echo "  http://${IP:-<Mac-IP-Adresse>}:8000"
+PORT="${PORT:-8765}"
+echo "  http://${IP:-<Mac-IP-Adresse>}:$PORT"
 echo ""
-./.venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000
+./.venv/bin/uvicorn main:app --host 0.0.0.0 --port "$PORT"

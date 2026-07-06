@@ -9,17 +9,21 @@ import subprocess
 import tempfile
 import traceback
 import uuid
+from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
 
 import yt_dlp
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import JSONResponse
 from fastapi.responses import FileResponse
-from starlette.background import BackgroundTask
 from yt_dlp.version import __version__ as YT_DLP_VERSION
 
 app = FastAPI(title="VideoLoader Server")
 logger = logging.getLogger("videoloader")
+logging.basicConfig(level=os.getenv("VIDEOLOADER_LOG_LEVEL", "INFO").upper())
+
+SERVER_DIR = Path(__file__).resolve().parent
+OUTPUT_DIR = Path(os.getenv("VIDEOLOADER_OUTPUT_DIR", SERVER_DIR / "downloads")).resolve()
 
 
 @app.get("/")
@@ -29,7 +33,56 @@ def root():
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "yt_dlp": YT_DLP_VERSION}
+    diagnostics = _diagnostics()
+    required_ok = diagnostics["output_dir"]["writable"] and diagnostics["ffmpeg"]["available"]
+    return {
+        "status": "ok" if required_ok else "degraded",
+        "yt_dlp": YT_DLP_VERSION,
+        "ffmpeg": diagnostics["ffmpeg"]["available"],
+        "ffprobe": diagnostics["ffprobe"]["available"],
+        "output_dir_writable": diagnostics["output_dir"]["writable"],
+    }
+
+
+@app.get("/api/health")
+def api_health():
+    return health()
+
+
+@app.get("/api/diagnostics")
+def api_diagnostics():
+    return _diagnostics()
+
+
+def _command_status(name: str) -> dict[str, str | bool | None]:
+    path = shutil.which(name)
+    return {"available": bool(path), "path": path}
+
+
+def _output_dir_status() -> dict[str, str | bool | None]:
+    try:
+        OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        probe = OUTPUT_DIR / f".write-test-{uuid.uuid4().hex}"
+        probe.write_text("ok", encoding="utf-8")
+        probe.unlink(missing_ok=True)
+        return {"path": str(OUTPUT_DIR), "writable": True, "error": None}
+    except Exception as exc:
+        return {"path": str(OUTPUT_DIR), "writable": False, "error": str(exc)}
+
+
+def _diagnostics() -> dict:
+    return {
+        "status": "ok",
+        "yt_dlp": {"available": True, "version": YT_DLP_VERSION},
+        "ffmpeg": _command_status("ffmpeg"),
+        "ffprobe": _command_status("ffprobe"),
+        "aria2c": _command_status("aria2c"),
+        "output_dir": _output_dir_status(),
+        "env": {
+            "VIDEOLOADER_OUTPUT_DIR": os.getenv("VIDEOLOADER_OUTPUT_DIR"),
+            "VIDEOLOADER_LOG_LEVEL": os.getenv("VIDEOLOADER_LOG_LEVEL"),
+        },
+    }
 
 
 def _safe_url(url: str, max_length: int = 160) -> str:
@@ -42,6 +95,45 @@ def _safe_url(url: str, max_length: int = 160) -> str:
 
 def _sanitize_log_text(text: str) -> str:
     return re.sub(r"https?://[^\s)]+", lambda match: _safe_url(match.group(0)), text)
+
+
+def _validate_video_url(url: str) -> str:
+    trimmed = (url or "").strip()
+    if not trimmed:
+        raise HTTPException(status_code=400, detail="Bitte gib einen Video-Link ein.")
+    parts = urlsplit(trimmed)
+    if parts.scheme not in {"http", "https"} or not parts.netloc:
+        raise HTTPException(status_code=400, detail="Bitte gib einen gültigen http- oder https-Link ein.")
+    return trimmed
+
+
+def _missing_prerequisite_response(request_id: str, message: str, detail: str | None = None):
+    body = {
+        "code": "MISSING_PREREQUISITE",
+        "message": message,
+        "phase": "startup",
+        "request_id": request_id,
+    }
+    if detail:
+        body["detail"] = detail
+    return JSONResponse(status_code=503, content={"error": body})
+
+
+def _safe_filename(title: str, fallback: str = "video") -> str:
+    safe = "".join(c for c in title if c.isalnum() or c in " -_").strip()
+    safe = re.sub(r"\s+", " ", safe)[:80].strip()
+    return safe or fallback
+
+
+def _unique_output_path(title: str, suffix: str) -> Path:
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    base = _safe_filename(title)
+    target = OUTPUT_DIR / f"{base}{suffix}"
+    counter = 2
+    while target.exists():
+        target = OUTPUT_DIR / f"{base} {counter}{suffix}"
+        counter += 1
+    return target
 
 
 class YtdlpLogger:
@@ -83,6 +175,7 @@ def _base_ydl_options(url: str) -> dict:
 
 
 def _extract_info(url: str) -> dict:
+    url = _validate_video_url(url)
     opts = _base_ydl_options(url)
     with yt_dlp.YoutubeDL(opts) as ydl:
         info = ydl.extract_info(url, download=False)
@@ -261,6 +354,34 @@ def api_download(
     format_id: str | None = Query(None, description="yt-dlp Format-Selektor"),
 ):
     request_id = uuid.uuid4().hex[:12]
+    try:
+        url = _validate_video_url(url)
+    except HTTPException as exc:
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={
+                "error": {
+                    "code": "INVALID_URL",
+                    "message": exc.detail,
+                    "phase": "validation",
+                    "request_id": request_id,
+                }
+            },
+        )
+    output_status = _output_dir_status()
+    if not output_status["writable"]:
+        return _missing_prerequisite_response(
+            request_id,
+            "Der Download-Ordner ist nicht beschreibbar.",
+            str(output_status.get("error") or ""),
+        )
+    if not shutil.which("ffmpeg"):
+        return _missing_prerequisite_response(
+            request_id,
+            "ffmpeg wurde nicht gefunden. Bitte installiere ffmpeg und starte den Server neu.",
+            "Windows: winget install Gyan.FFmpeg oder choco install ffmpeg. macOS: brew install ffmpeg.",
+        )
+
     requested_quality = quality if quality is not None else height
     format_selector = (
         format_id.strip()
@@ -320,12 +441,15 @@ def api_download(
             ),
         )
 
-    title = (info.get("title") or "video")[:80]
-    safe_title = "".join(c for c in title if c.isalnum() or c in " -_").strip() or "video"
+    title = info.get("title") or "video"
+    source_path = Path(path)
+    output_path = _unique_output_path(title, source_path.suffix or ".mp4")
+    shutil.move(str(source_path), output_path)
+    shutil.rmtree(tmpdir, ignore_errors=True)
+    safe_title = _safe_filename(title)
 
     return FileResponse(
-        path,
+        output_path,
         media_type="video/mp4",
         filename=f"{safe_title}.mp4",
-        background=BackgroundTask(shutil.rmtree, tmpdir, ignore_errors=True),
     )

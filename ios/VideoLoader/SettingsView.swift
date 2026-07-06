@@ -56,8 +56,8 @@ struct SettingsView: View {
                     serverCard(
                         title: "Lokaler Server (VideoLoader)",
                         text: $macServerURL,
-                        placeholder: "http://100.80.105.62:8765",
-                        helperText: "Dein lokaler Windows-Server. Für YouTube diesen Server-Modus verwenden, nicht den Cloud-Server."
+                        placeholder: "http://192.168.1.23:8765",
+                        helperText: "Dein lokaler Mac- oder Windows-Server im selben WLAN. Für YouTube diesen Server-Modus verwenden, nicht den Cloud-Server."
                     )
                 }
             }
@@ -106,7 +106,7 @@ struct SettingsView: View {
 
 #Preview {
     SettingsView(
-        macServerURL: .constant("http://100.80.105.62:8765"),
+        macServerURL: .constant("http://192.168.1.23:8765"),
         cloudServerURL: .constant("http://158.101.168.11:8765"),
         activeServerRaw: .constant(ServerKind.videoLoader.rawValue)
     )

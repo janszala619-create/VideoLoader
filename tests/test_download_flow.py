@@ -73,14 +73,22 @@ class DownloadFlowTests(unittest.TestCase):
     def setUp(self):
         FakeYoutubeDL.calls = []
         FakeYoutubeDL.fail_download = False
+        self.output_dir = tempfile.TemporaryDirectory()
         self.patcher = patch.object(main.yt_dlp, "YoutubeDL", FakeYoutubeDL)
         self.ffprobe_patcher = patch.object(main, "_FFPROBE_PATH", None)
+        self.ffmpeg_patcher = patch.object(main.shutil, "which", lambda name: f"/usr/bin/{name}" if name == "ffmpeg" else None)
+        self.output_patcher = patch.object(main, "OUTPUT_DIR", Path(self.output_dir.name))
         self.patcher.start()
         self.ffprobe_patcher.start()
+        self.ffmpeg_patcher.start()
+        self.output_patcher.start()
 
     def tearDown(self):
+        self.output_patcher.stop()
+        self.ffmpeg_patcher.stop()
         self.ffprobe_patcher.stop()
         self.patcher.stop()
+        self.output_dir.cleanup()
 
     def test_720p_download_uses_height_selector(self):
         response = main.api_download("https://example.test/watch/1", quality=720)
@@ -173,6 +181,31 @@ class DownloadFlowTests(unittest.TestCase):
         self.assertEqual(payload["error"]["code"], "DOWNLOAD_FAILED")
         self.assertEqual(payload["error"]["message"], "Video download failed")
         self.assertEqual(payload["error"]["phase"], "download")
+
+    def test_empty_download_url_returns_validation_error_without_ytdlp(self):
+        response = main.api_download("", quality=720)
+        payload = json.loads(response.body)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(payload["error"]["code"], "INVALID_URL")
+        self.assertEqual(payload["error"]["phase"], "validation")
+        self.assertEqual(FakeYoutubeDL.calls, [])
+
+    def test_download_requires_ffmpeg_with_clear_error(self):
+        with patch.object(main.shutil, "which", return_value=None):
+            response = main.api_download("https://example.test/watch/1", quality=720)
+        payload = json.loads(response.body)
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(payload["error"]["code"], "MISSING_PREREQUISITE")
+        self.assertIn("ffmpeg", payload["error"]["message"])
+
+    def test_health_reports_diagnostics(self):
+        payload = main.health()
+
+        self.assertEqual(payload["status"], "ok")
+        self.assertTrue(payload["ffmpeg"])
+        self.assertTrue(payload["output_dir_writable"])
 
     def test_unavailable_video_returns_structured_download_error(self):
         response = main.api_download("https://gone.example.test/watch/1", quality=1080)

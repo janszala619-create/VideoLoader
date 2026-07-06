@@ -22,27 +22,52 @@ Die App kann zwei verschiedene Server ansprechen; oben wählst du per Schalter a
 
 Kopiere den kompletten Ordner `VideoLoader` auf deinen Mac (z. B. per USB-Stick, iCloud, oder als ZIP per E-Mail an dich selbst).
 
-## Schritt 2: Server auf dem Mac starten
+## Schritt 2: Server lokal starten
 
 1. **ffmpeg installieren** (einmalig, wird zum Zusammenfügen von Bild und Ton gebraucht).
-   Öffne die **Terminal**-App und tippe:
+   Auf macOS in der **Terminal**-App:
    ```bash
    brew install ffmpeg
    ```
    Falls `brew` nicht gefunden wird, installiere zuerst Homebrew von https://brew.sh.
 
-2. **Server starten.** Im Terminal:
+   Auf Windows in **PowerShell**:
+   ```powershell
+   winget install Gyan.FFmpeg
+   ```
+   Öffne danach PowerShell neu, damit `ffmpeg` im PATH gefunden wird.
+
+2. **Server starten.**
+
+   macOS/Linux:
    ```bash
    cd /Pfad/zum/VideoLoader/server
    chmod +x start.sh
    ./start.sh
    ```
+
+   Windows PowerShell:
+   ```powershell
+   cd C:\Pfad\zum\VideoLoader\server
+   .\start.ps1
+   ```
+
    Beim ersten Start richtet das Skript alles automatisch ein. Danach zeigt es dir die Adresse an, z. B.:
    ```
    Server startet. Diese Adresse in der App eintragen:
-     http://192.168.1.23:8000
+     http://192.168.1.23:8765
    ```
    **Diese Adresse brauchst du gleich in der App.** Lass das Terminal-Fenster offen, solange du die App benutzt.
+
+3. **Server prüfen.** Öffne im Browser:
+   ```text
+   http://192.168.1.23:8765/health
+   ```
+   Für eine ausführlichere Diagnose:
+   ```text
+   http://192.168.1.23:8765/api/diagnostics
+   ```
+   Dort siehst du, ob der Download-Ordner beschreibbar ist und ob `ffmpeg`, `ffprobe` und `yt-dlp` gefunden werden.
 
 ## Schritt 3: App auf das iPhone installieren
 
@@ -59,7 +84,7 @@ Kopiere den kompletten Ordner `VideoLoader` auf deinen Mac (z. B. per USB-Stick,
 
 ## Schritt 4: App benutzen
 
-1. Beim ersten Start öffnen sich die **Einstellungen**: Trage dort die Server-Adresse aus Schritt 2 ein (z. B. `http://192.168.1.23:8000`). iPhone und Mac müssen im **selben WLAN** sein.
+1. Beim ersten Start öffnen sich die **Einstellungen**: Trage dort die Server-Adresse aus Schritt 2 ein (z. B. `http://192.168.1.23:8765`). iPhone und Computer müssen im **selben WLAN** sein.
 2. Video-Link kopieren (z. B. über „Teilen → Kopieren“ in der YouTube-App), in der App einfügen und **„Video prüfen“** tippen.
 3. Vorschau ansehen (▶ auf dem Vorschaubild), **Qualität wählen** und **„Herunterladen“** tippen.
 4. Das Video erscheint im Tab **„Meine Videos“**: Antippen zum Abspielen, Teilen-Symbol zum Weitergeben, Foto-Symbol zum Sichern in die **Fotos-Galerie** (beim ersten Mal fragt iOS nach Erlaubnis – erlauben). Wischen nach links löscht ein Video.
@@ -68,7 +93,8 @@ Kopiere den kompletten Ordner `VideoLoader` auf deinen Mac (z. B. per USB-Stick,
 
 ## Häufige Probleme
 
-- **„Server nicht erreichbar“** – Läuft `start.sh` noch auf dem Mac? Sind iPhone und Mac im selben WLAN? Stimmt die Adresse (inkl. `:8000`)?
+- **„Server nicht erreichbar“** – Läuft `start.sh` oder `start.ps1` noch? Sind iPhone und Computer im selben WLAN? Stimmt die Adresse (inkl. `:8765`)?
+- **„ffmpeg wurde nicht gefunden“** – Installiere `ffmpeg` wie oben beschrieben und starte danach Terminal/PowerShell und den Server neu.
 - **YouTube-Video schlägt fehl** – yt-dlp muss aktuell sein. Einfach den Server neu starten (`./start.sh` aktualisiert yt-dlp automatisch).
-- **Unterwegs nutzen (nicht im Heim-WLAN)** – Installiere [Tailscale](https://tailscale.com) (kostenlos) auf Mac und iPhone; trage dann in der App die Tailscale-Adresse des Macs ein (z. B. `http://100.x.y.z:8000`).
+- **Unterwegs nutzen (nicht im Heim-WLAN)** – Installiere [Tailscale](https://tailscale.com) (kostenlos) auf Computer und iPhone; trage dann in der App die Tailscale-Adresse des Computers ein (z. B. `http://100.x.y.z:8765`).
 - **Server in der Cloud statt auf dem Mac?** – Möglich (der `server/`-Ordner läuft überall, wo Python + ffmpeg vorhanden sind), aber Achtung: YouTube blockiert Rechenzentrums-IP-Adressen häufig. Der Server zu Hause auf dem Mac ist am zuverlässigsten.
