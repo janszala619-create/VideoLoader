@@ -48,6 +48,17 @@ if ! command -v aria2c >/dev/null 2>&1; then
   fi
 fi
 
+POT_PROVIDER_HOME="$HOME/bgutil-ytdlp-pot-provider/server"
+if [ ! -f "$POT_PROVIDER_HOME/src/generate_once.ts" ]; then
+  echo ""
+  echo "Hinweis: PO-Token-Provider (für 720p/1080p+ von YouTube) fehlt."
+  echo "Ohne ihn liefert YouTube oft nur ein 360p-Format aus. Einrichtung:"
+  echo "  git clone https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git \"$HOME/bgutil-ytdlp-pot-provider\""
+  echo "  cd \"$POT_PROVIDER_HOME\" && npm install"
+  echo "Danach den Server neu starten. Benötigt Node.js und Deno (für den JS-Signatur-Solver)."
+  echo ""
+fi
+
 echo ""
 echo "Server startet. Diese Adresse in der App eintragen:"
 IP=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null)

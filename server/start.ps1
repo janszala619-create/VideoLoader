@@ -40,6 +40,17 @@ if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) {
     Write-Host ""
 }
 
+$potProviderHome = Join-Path $HOME "bgutil-ytdlp-pot-provider\server"
+if (-not (Test-Path -LiteralPath (Join-Path $potProviderHome "src\generate_once.ts"))) {
+    Write-Host ""
+    Write-Host "Hinweis: PO-Token-Provider (fuer 720p/1080p+ von YouTube) fehlt."
+    Write-Host "Ohne ihn liefert YouTube oft nur ein 360p-Format aus. Einrichtung:"
+    Write-Host "  git clone https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git `"$HOME\bgutil-ytdlp-pot-provider`""
+    Write-Host "  cd `"$potProviderHome`"; npm install"
+    Write-Host "Danach den Server neu starten. Benoetigt Node.js und Deno (fuer den JS-Signatur-Solver)."
+    Write-Host ""
+}
+
 $port = if ($env:PORT) { $env:PORT } else { "8765" }
 $ip = (Get-NetIPAddress -AddressFamily IPv4 |
     Where-Object {
