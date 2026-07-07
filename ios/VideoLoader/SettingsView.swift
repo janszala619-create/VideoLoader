@@ -9,42 +9,8 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: AppGlassTheme.sectionSpacing) {
-                    VStack(alignment: .leading, spacing: AppGlassSpacing.sm) {
-                        Text("Verbindung")
-                            .font(AppGlassTypography.largeTitle)
-                            .foregroundStyle(AppGlassColors.textPrimary)
-
-                        Text("Wähle den Server, der am zuverlässigsten zu deinem Setup passt.")
-                            .font(AppGlassTypography.body)
-                            .foregroundStyle(AppGlassColors.textSecondary)
-                    }
-
-                    GlassCard {
-                        VStack(alignment: .leading, spacing: AppGlassSpacing.md) {
-                            AppGlassSectionHeader(title: "Aktiver Server")
-
-                            Text("Server-Modus")
-                                .font(AppGlassTypography.headline)
-                                .foregroundStyle(AppGlassColors.textPrimary)
-
-                            Picker("Server", selection: $activeServerRaw) {
-                                ForEach(ServerKind.allCases) { kind in
-                                    Text(kind.label).tag(kind.rawValue)
-                                }
-                            }
-                            .pickerStyle(.segmented)
-                            .tint(AppGlassColors.accentPrimary)
-
-                            if let activeServer = ServerKind(rawValue: activeServerRaw) {
-                                GlassStatusBanner(
-                                    tone: .neutral,
-                                    title: activeServer.label,
-                                    message: activeServer.settingsHint
-                                )
-                            }
-                        }
-                    }
+                VStack(alignment: .leading, spacing: AppSpacing.xl) {
+                    activeServerCard
 
                     serverCard(
                         title: "Cloud-Server (VidSave, Legacy)",
@@ -60,15 +26,48 @@ struct SettingsView: View {
                         helperText: "Dein lokaler Mac- oder Windows-Server im selben WLAN. Für YouTube diesen Server-Modus verwenden, nicht den Cloud-Server."
                     )
                 }
+                .padding(.horizontal, AppSpacing.lg)
+                .padding(.top, AppSpacing.md)
             }
-            .padding(AppGlassTheme.screenPadding)
             .background(AppGlassBackground())
             .navigationTitle("Einstellungen")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Fertig") { dismiss() }
-                        .foregroundStyle(AppGlassColors.textPrimary)
+                        .foregroundStyle(AppTheme.primaryText)
+                }
+            }
+        }
+    }
+
+    private var activeServerCard: some View {
+        AppCard {
+            AppSectionHeader(
+                title: "Verbindung",
+                subtitle: "Wähle den Server, der am zuverlässigsten zu deinem Setup passt."
+            )
+
+            Picker("Server", selection: $activeServerRaw) {
+                ForEach(ServerKind.allCases) { kind in
+                    Text(kind.label).tag(kind.rawValue)
+                }
+            }
+            .pickerStyle(.segmented)
+            .tint(AppTheme.accent)
+
+            if let activeServer = ServerKind(rawValue: activeServerRaw) {
+                HStack(alignment: .top, spacing: AppSpacing.sm) {
+                    AppStatusDot(color: AppTheme.accent)
+                        .padding(.top, 5)
+                    VStack(alignment: .leading, spacing: AppSpacing.xs) {
+                        Text(activeServer.label)
+                            .font(AppTypography.bodyEmphasized)
+                            .foregroundStyle(AppTheme.primaryText)
+                        Text(activeServer.settingsHint)
+                            .font(AppTypography.footnote)
+                            .foregroundStyle(AppTheme.secondaryText)
+                    }
                 }
             }
         }
@@ -80,25 +79,22 @@ struct SettingsView: View {
         placeholder: String,
         helperText: String
     ) -> some View {
-        GlassCard {
-            VStack(alignment: .leading, spacing: AppGlassSpacing.md) {
-                AppGlassSectionHeader(title: title)
+        AppCard {
+            AppSectionHeader(title: title)
 
-                Text("Server-Adresse")
-                    .font(AppGlassTypography.headline)
-                    .foregroundStyle(AppGlassColors.textPrimary)
+            AppTextField(
+                label: "Server-Adresse",
+                placeholder: placeholder,
+                text: text,
+                systemImage: "link",
+                keyboardType: .URL,
+                autocapitalization: .never,
+                disablesAutocorrection: true
+            )
 
-                GlassInputField(
-                    label: "URL",
-                    placeholder: placeholder,
-                    text: text,
-                    helperText: helperText,
-                    keyboardType: .URL,
-                    textContentType: .URL,
-                    autocapitalization: .never,
-                    disablesAutocorrection: true
-                )
-            }
+            Text(helperText)
+                .font(AppTypography.footnote)
+                .foregroundStyle(AppTheme.secondaryText)
         }
     }
 
