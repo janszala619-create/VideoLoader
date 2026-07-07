@@ -1,5 +1,14 @@
 import SwiftUI
 
+/// Button-Stil mit dezentem Press-Scale-Feedback (Preset "smooth").
+private struct PressScaleButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .animation(AppMotion.buttonPress, value: configuration.isPressed)
+    }
+}
+
 /// Visuelle Ausprägung eines `AppButton`.
 enum AppButtonKind {
     case primary
@@ -42,7 +51,10 @@ struct AppButton: View {
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        Button(action: {
+            AppHaptics.lightImpact()
+            action()
+        }) {
             HStack(spacing: AppSpacing.sm) {
                 if isLoading {
                     ProgressView()
@@ -67,8 +79,9 @@ struct AppButton: View {
             }
             .opacity(isDisabled ? 0.5 : 1)
         }
+        .buttonStyle(PressScaleButtonStyle())
         .disabled(isDisabled || isLoading)
-        .animation(.easeOut(duration: 0.15), value: isLoading)
+        .animation(AppMotion.standard, value: isLoading)
     }
 }
 

@@ -1,5 +1,14 @@
 import SwiftUI
 
+/// Button-Stil mit dezentem Press-Scale-Feedback (Preset "smooth").
+private struct PressScaleButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .animation(AppMotion.buttonPress, value: configuration.isPressed)
+    }
+}
+
 /// Zeile für eine auswählbare Qualitätsoption (z. B. Auflösung/Format).
 struct QualityOptionRow: View {
     let title: String
@@ -9,7 +18,10 @@ struct QualityOptionRow: View {
     let onSelect: () -> Void
 
     var body: some View {
-        Button(action: onSelect) {
+        Button(action: {
+            AppHaptics.selectionChanged()
+            onSelect()
+        }) {
             HStack(spacing: AppSpacing.md) {
                 VStack(alignment: .leading, spacing: AppSpacing.xs) {
                     HStack(spacing: AppSpacing.sm) {
@@ -46,8 +58,8 @@ struct QualityOptionRow: View {
                     .stroke(isSelected ? AppTheme.accent.opacity(0.5) : AppColorsPremium.glassBorder, lineWidth: 1)
             )
         }
-        .buttonStyle(.plain)
-        .animation(.easeOut(duration: 0.15), value: isSelected)
+        .buttonStyle(PressScaleButtonStyle())
+        .animation(AppMotion.selectionChange, value: isSelected)
         .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
 }

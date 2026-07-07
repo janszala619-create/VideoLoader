@@ -29,6 +29,7 @@ struct DownloadProgressCard: View {
                 if let progress {
                     ProgressView(value: progress)
                         .tint(statusTone)
+                        .animation(AppMotion.quick, value: progress)
                 } else {
                     ProgressView()
                         .tint(statusTone)

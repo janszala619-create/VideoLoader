@@ -24,6 +24,7 @@ struct QueueView: View {
                         VStack(spacing: AppSpacing.md) {
                             ForEach(queue.jobs.reversed()) { job in
                                 row(job)
+                                    .animation(AppMotion.statusTransition, value: job.status)
                             }
                         }
                     }
@@ -74,6 +75,7 @@ struct QueueView: View {
                 statusTone: AppTheme.secondaryText
             )
             .contextMenu { removeMenuItem(for: job) }
+            .transition(AppMotion.contentAppearTransition)
         case .running:
             DownloadProgressCard(
                 title: job.title,
@@ -83,6 +85,7 @@ struct QueueView: View {
                 statusTone: AppTheme.accent
             )
             .contextMenu { removeMenuItem(for: job) }
+            .transition(AppMotion.contentAppearTransition)
         case .done:
             AppCard {
                 HStack(alignment: .top, spacing: AppSpacing.md) {
@@ -102,6 +105,7 @@ struct QueueView: View {
                 }
             }
             .contextMenu { removeMenuItem(for: job) }
+            .transition(AppMotion.contentAppearTransition)
         case .failed:
             ErrorStateView(
                 title: "Download fehlgeschlagen",
@@ -110,6 +114,7 @@ struct QueueView: View {
                 retryAction: { queue.retry(job) }
             )
             .contextMenu { removeMenuItem(for: job) }
+            .transition(AppMotion.contentAppearTransition)
         }
     }
 

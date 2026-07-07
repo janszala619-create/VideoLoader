@@ -1,5 +1,6 @@
 import AVFoundation
 import Foundation
+import UIKit
 
 /// Ein Auftrag in der Download-Warteschlange.
 struct DownloadJob: Identifiable, Codable, Equatable {
@@ -163,6 +164,9 @@ final class DownloadQueue: NSObject, ObservableObject {
                 self.jobs[index].status = success ? .done : .failed
                 self.jobs[index].message = message
                 if success { self.jobs[index].progress = 1 }
+                let generator = UINotificationFeedbackGenerator()
+                generator.prepare()
+                generator.notificationOccurred(success ? .success : .error)
             }
             self.retriesLeft[id] = nil
             self.fallbackUsed.remove(id)

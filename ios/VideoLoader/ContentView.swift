@@ -58,6 +58,7 @@ struct ContentView: View {
                             retryTitle: "Einstellungen öffnen",
                             retryAction: { showSettings = true }
                         )
+                        .transition(AppMotion.bannerTransition)
                     }
 
                     if isLoadingInfo {
@@ -65,24 +66,33 @@ struct ContentView: View {
                             title: "Video wird geprüft",
                             message: "Metadaten und verfügbare Qualitäten werden geladen."
                         )
+                        .transition(AppMotion.contentAppearTransition)
                     }
 
                     if let justQueuedTitle {
                         queuedBanner(for: justQueuedTitle)
+                            .transition(AppMotion.bannerTransition)
                     }
 
                     if let info {
-                        previewSection(info)
-                        qualitySection(info)
-                        downloadButton
+                        Group {
+                            previewSection(info)
+                            qualitySection(info)
+                            downloadButton
+                        }
+                        .transition(AppMotion.contentAppearTransition)
                     } else if isIdle {
                         EmptyStateView(
                             systemImage: "link.badge.plus",
                             title: "Bereit für deinen ersten Download",
                             message: "Füge oben einen Video-Link ein und tippe auf „Prüfen“, um Vorschau und Qualitäten zu laden."
                         )
+                        .transition(AppMotion.contentAppearTransition)
                     }
                 }
+                .animation(AppMotion.appearTransition, value: errorMessage == nil)
+                .animation(AppMotion.appearTransition, value: isLoadingInfo)
+                .animation(AppMotion.appearTransition, value: info == nil)
             }
             .padding(.horizontal, AppSpacing.lg)
             .padding(.top, AppSpacing.md)
@@ -507,13 +517,18 @@ struct ContentView: View {
                 primaryURL: url,
                 fallbackURL: fallback == url ? nil : fallback
             )
-            justQueuedTitle = title
-            videoLink = ""
-            info = nil
-            errorMessage = nil
+            AppHaptics.mediumImpact()
+            withAnimation(AppMotion.statusTransition) {
+                justQueuedTitle = title
+                videoLink = ""
+                info = nil
+                errorMessage = nil
+            }
             Task {
                 try? await Task.sleep(for: .seconds(3))
-                justQueuedTitle = nil
+                withAnimation(AppMotion.statusTransition) {
+                    justQueuedTitle = nil
+                }
             }
         } catch let error as APIError {
             errorMessage = error.errorDescription
