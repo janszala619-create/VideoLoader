@@ -76,10 +76,30 @@ struct ServerAPI {
         do {
             let dto = try decoder.decode(VideoLoaderInfoDTO.self, from: data)
 
-            var qualities = dto.heights.map {
-                QualityOption(id: "h\($0)", label: "\($0)p", height: $0, formatId: nil)
+            // Bevorzugt die vom Server fertig zusammengestellte Qualitätsliste
+            // (inkl. format_selector, Empfehlung, Subtitle). Fällt auf die alte
+            // reine Höhen-Liste zurück, falls ein älterer Server noch kein
+            // "qualities" liefert.
+            let qualities: [QualityOption]
+            if let serverQualities = dto.qualities, !serverQualities.isEmpty {
+                qualities = serverQualities.map {
+                    QualityOption(
+                        id: $0.id,
+                        label: $0.label,
+                        subtitle: $0.subtitle,
+                        height: $0.height,
+                        formatId: nil,
+                        formatSelector: $0.formatSelector,
+                        isRecommended: $0.isRecommended ?? false
+                    )
+                }
+            } else {
+                var fallback = dto.heights.map {
+                    QualityOption(id: "h\($0)", label: "\($0)p", height: $0, formatId: nil)
+                }
+                fallback.append(QualityOption(id: "auto", label: "Automatisch (beste Qualität)", height: nil, formatId: nil))
+                qualities = fallback
             }
-            qualities.append(QualityOption(id: "auto", label: "Automatisch (beste Qualität)", height: nil, formatId: nil))
 
             return VideoInfo(
                 title: dto.title,
@@ -129,7 +149,12 @@ struct ServerAPI {
         switch kind {
         case .videoLoader:
             var query = [URLQueryItem(name: "url", value: normalized)]
-            if let height = quality?.height {
+            if let formatSelector = quality?.formatSelector, !formatSelector.isEmpty {
+                // Server hat für diese Qualität bereits einen fertigen yt-dlp-Selector
+                // mitgeliefert (aus /api/info qualities[].format_selector) – der ist
+                // präziser als eine reine Höhenangabe und hat daher Vorrang.
+                query.append(URLQueryItem(name: "format_selector", value: formatSelector))
+            } else if let height = quality?.height {
                 query.append(URLQueryItem(name: "quality", value: String(height)))
             }
             let endpoint = try url(path: "/api/download", query: query)
@@ -360,12 +385,24 @@ struct ServerAPI {
 // MARK: - Antwortformate der beiden Server
 
 private struct VideoLoaderInfoDTO: Decodable {
+    struct Quality: Decodable {
+        let id: String
+        let label: String
+        let subtitle: String?
+        let height: Int?
+        let ext: String?
+        let kind: String?
+        let formatSelector: String?
+        let isRecommended: Bool?
+    }
+
     let title: String
     let uploader: String?
     let duration: Double?
     let thumbnail: String?
     let previewUrl: String?
     let heights: [Int]
+    let qualities: [Quality]?
 }
 
 private struct VidSaveInfoDTO: Decodable {

@@ -25,12 +25,17 @@ enum ServerKind: String, CaseIterable, Identifiable {
 }
 
 /// Eine wählbare Qualitätsstufe – server-neutral. Je nach Server wird `height`
-/// (lokaler Server) oder `formatId` (Cloud-Server) für den Download verwendet.
+/// (lokaler Server), `formatId` (Cloud-Server) oder – falls vom Server geliefert –
+/// `formatSelector` (fertiger yt-dlp-Format-String, hat Vorrang vor beidem) für
+/// den Download verwendet.
 struct QualityOption: Identifiable, Hashable {
     let id: String
     let label: String
+    var subtitle: String? = nil
     let height: Int?
     let formatId: String?
+    var formatSelector: String? = nil
+    var isRecommended: Bool = false
 }
 
 /// Ein in der App gespeichertes, heruntergeladenes Video.
