@@ -43,32 +43,28 @@ struct ContentView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: AppGlassTheme.sectionSpacing) {
+                VStack(alignment: .leading, spacing: AppSpacing.xl) {
                     serverRow
                     linkInputSection
 
                     if let errorMessage {
-                        GlassErrorStateView(
+                        ErrorStateView(
                             title: "Aktion fehlgeschlagen",
                             message: errorMessage,
-                            actionTitle: "Einstellungen öffnen",
-                            action: { showSettings = true }
+                            retryTitle: "Einstellungen öffnen",
+                            retryAction: { showSettings = true }
                         )
                     }
 
                     if isLoadingInfo {
-                        GlassLoadingStateView(
+                        LoadingStateView(
                             title: "Video wird geprüft",
                             message: "Metadaten und verfügbare Qualitäten werden geladen."
                         )
                     }
 
                     if let justQueuedTitle {
-                        GlassStatusBanner(
-                            tone: .success,
-                            title: "Zur Warteschlange hinzugefügt",
-                            message: "„\(justQueuedTitle)“ wird jetzt im Tab „Downloads“ verarbeitet."
-                        )
+                        queuedBanner(for: justQueuedTitle)
                     }
 
                     if let info {
@@ -78,8 +74,8 @@ struct ContentView: View {
                     }
                 }
             }
-            .padding(.horizontal, AppGlassTheme.screenPadding)
-            .padding(.top, AppGlassSpacing.md)
+            .padding(.horizontal, AppSpacing.lg)
+            .padding(.top, AppSpacing.md)
             .background(AppGlassBackground())
             .navigationTitle("VideoLoader")
             .navigationBarTitleDisplayMode(.large)
@@ -89,7 +85,7 @@ struct ContentView: View {
                         showSettings = true
                     } label: {
                         Image(systemName: "gearshape")
-                            .foregroundStyle(AppGlassColors.textPrimary)
+                            .foregroundStyle(AppTheme.primaryText)
                     }
                     .accessibilityLabel("Einstellungen öffnen")
                 }
@@ -147,7 +143,7 @@ struct ContentView: View {
     // MARK: - Server Row (kompakt, kein eigener Abschnitt)
 
     private var serverRow: some View {
-        HStack(spacing: AppGlassSpacing.md) {
+        HStack(spacing: AppSpacing.md) {
             Picker("", selection: $activeServerRaw) {
                 ForEach(ServerKind.allCases) { kind in
                     Text(kind.label).tag(kind.rawValue)
@@ -169,47 +165,47 @@ struct ContentView: View {
         Button {
             Task { await checkServer() }
         } label: {
-            HStack(spacing: 5) {
-                Circle()
-                    .fill(serverOnline == true ? AppGlassColors.success :
-                          serverOnline == false ? AppGlassColors.error :
-                          AppGlassColors.textTertiary)
-                    .frame(width: 7, height: 7)
-                    .shadow(
-                        color: serverOnline == true ? AppGlassColors.success.opacity(0.7) : .clear,
-                        radius: 4
-                    )
+            HStack(spacing: AppSpacing.xs) {
+                AppStatusDot(
+                    color: serverOnline == true ? AppTheme.success :
+                        serverOnline == false ? AppTheme.danger :
+                        AppTheme.secondaryText.opacity(0.6),
+                    diameter: 7
+                )
 
                 Text(serverOnline == true ? "Online" :
                      serverOnline == false ? "Offline" : "…")
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(AppGlassColors.textSecondary)
+                    .font(AppTypography.caption.weight(.medium))
+                    .foregroundStyle(AppTheme.secondaryText)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
+            .padding(.horizontal, AppSpacing.sm)
+            .padding(.vertical, AppSpacing.xs + 3)
             .background(
                 Capsule()
-                    .fill(AppGlassColors.glassSurfaceStrong)
-                    .overlay(Capsule().stroke(AppGlassColors.glassBorder, lineWidth: 1))
+                    .fill(AppColorsPremium.glassSurfaceStrong)
+                    .overlay(Capsule().stroke(AppColorsPremium.glassBorder, lineWidth: 1))
             )
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Serverstatus prüfen")
     }
 
-    // MARK: - Link-Eingabe (kein GlassCard-Wrapper)
+    // MARK: - Link-Eingabe (kein AppCard-Wrapper)
 
     private var linkInputSection: some View {
-        VStack(alignment: .leading, spacing: AppGlassSpacing.md) {
-            GlassInputField(
-                label: "Video-Link",
-                placeholder: "Link hier einfügen",
-                text: $videoLink,
-                keyboardType: .URL,
-                textContentType: .URL,
-                autocapitalization: .never,
-                disablesAutocorrection: true
-            ) {
+        VStack(alignment: .leading, spacing: AppSpacing.md) {
+            AppSectionHeader(title: "Video-Link")
+
+            HStack(spacing: AppSpacing.sm) {
+                AppTextField(
+                    placeholder: "Link hier einfügen",
+                    text: $videoLink,
+                    systemImage: "link",
+                    keyboardType: .URL,
+                    autocapitalization: .never,
+                    disablesAutocorrection: true
+                )
+
                 if videoLink.isEmpty {
                     Button {
                         if let pasted = UIPasteboard.general.string {
@@ -219,9 +215,9 @@ struct ContentView: View {
                         }
                     } label: {
                         Image(systemName: "doc.on.clipboard")
-                            .foregroundStyle(AppGlassColors.textSecondary)
+                            .foregroundStyle(AppTheme.secondaryText)
                     }
-                    .frame(minWidth: AppGlassTheme.controlHeight, minHeight: AppGlassTheme.controlHeight)
+                    .frame(width: 44, height: 44)
                     .accessibilityLabel("Link aus Zwischenablage einfügen")
                 } else {
                     Button {
@@ -230,34 +226,58 @@ struct ContentView: View {
                         errorMessage = nil
                     } label: {
                         Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(AppGlassColors.textSecondary)
+                            .foregroundStyle(AppTheme.secondaryText)
                     }
-                    .frame(minWidth: AppGlassTheme.controlHeight, minHeight: AppGlassTheme.controlHeight)
+                    .frame(width: 44, height: 44)
                     .accessibilityLabel("Linkfeld leeren")
                 }
             }
 
-            HStack(spacing: AppGlassSpacing.sm) {
-                Button {
+            HStack(spacing: AppSpacing.sm) {
+                AppButton(
+                    title: "Prüfen",
+                    kind: .primary,
+                    systemImage: "magnifyingglass",
+                    isLoading: isLoadingInfo,
+                    isDisabled: cleanedLink.isEmpty
+                ) {
                     Task { await loadInfo() }
-                } label: {
-                    Label("Prüfen", systemImage: "magnifyingglass")
                 }
-                .buttonStyle(GlassPrimaryButtonStyle())
-                .disabled(cleanedLink.isEmpty || isLoadingInfo)
 
                 if clipboardHasLink && videoLink.isEmpty {
-                    Button {
+                    AppButton(
+                        title: "Einfügen",
+                        kind: .secondary,
+                        systemImage: "doc.on.clipboard"
+                    ) {
                         if let pasted = UIPasteboard.general.string {
                             videoLink = pasted
                             clipboardHasLink = false
                             errorMessage = nil
                             Task { await loadInfo() }
                         }
-                    } label: {
-                        Label("Einfügen", systemImage: "doc.on.clipboard")
                     }
-                    .buttonStyle(GlassSecondaryButtonStyle())
+                }
+            }
+        }
+    }
+
+    // MARK: - Zur Warteschlange hinzugefügt
+
+    private func queuedBanner(for title: String) -> some View {
+        AppCard {
+            HStack(alignment: .top, spacing: AppSpacing.md) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.title3)
+                    .foregroundStyle(AppTheme.success)
+
+                VStack(alignment: .leading, spacing: AppSpacing.xs) {
+                    Text("Zur Warteschlange hinzugefügt")
+                        .font(AppTypography.sectionTitle)
+                        .foregroundStyle(AppTheme.primaryText)
+                    Text("„\(title)“ wird jetzt im Tab „Downloads“ verarbeitet.")
+                        .font(AppTypography.footnote)
+                        .foregroundStyle(AppTheme.secondaryText)
                 }
             }
         }
@@ -266,24 +286,24 @@ struct ContentView: View {
     // MARK: - Vorschau
 
     private func previewSection(_ info: VideoInfo) -> some View {
-        VStack(alignment: .leading, spacing: AppGlassSpacing.md) {
-            AppGlassSectionHeader(title: "Vorschau")
+        VStack(alignment: .leading, spacing: AppSpacing.md) {
+            AppSectionHeader(title: "Vorschau")
 
-            GlassCard {
+            AppCard {
                 ZStack {
                     AsyncImage(url: info.thumbnailURL) { image in
                         image.resizable().aspectRatio(contentMode: .fit)
                     } placeholder: {
                         Rectangle()
-                            .fill(AppGlassColors.glassSurfaceStrong)
+                            .fill(AppColorsPremium.glassSurfaceStrong)
                             .aspectRatio(16 / 9, contentMode: .fit)
                             .overlay {
                                 Image(systemName: "film")
                                     .font(.largeTitle)
-                                    .foregroundStyle(AppGlassColors.textTertiary)
+                                    .foregroundStyle(AppColorsPremium.textTertiary)
                             }
                     }
-                    .clipShape(RoundedRectangle(cornerRadius: AppGlassTheme.radiusLarge, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: AppRadius.lg, style: .continuous))
 
                     if info.previewURL != nil {
                         Button {
@@ -292,17 +312,17 @@ struct ContentView: View {
                             Image(systemName: "play.circle.fill")
                                 .font(.system(size: 56))
                                 .foregroundStyle(.white)
-                                .shadow(color: AppGlassColors.accentGlow, radius: 18, x: 0, y: 6)
+                                .shadow(color: AppColorsPremium.accentGlow, radius: 18, x: 0, y: 6)
                         }
                         .accessibilityLabel("Videovorschau abspielen")
                     }
                 }
 
                 Text(info.title)
-                    .font(AppGlassTypography.title3)
-                    .foregroundStyle(AppGlassColors.textPrimary)
+                    .font(AppTypography.subtitle)
+                    .foregroundStyle(AppTheme.primaryText)
 
-                HStack(spacing: 12) {
+                HStack(spacing: AppSpacing.md) {
                     if let uploader = info.uploader {
                         Label(uploader, systemImage: "person.circle")
                     }
@@ -310,8 +330,8 @@ struct ContentView: View {
                         Label(duration, systemImage: "clock")
                     }
                 }
-                .font(AppGlassTypography.subheadline)
-                .foregroundStyle(AppGlassColors.textSecondary)
+                .font(AppTypography.footnote)
+                .foregroundStyle(AppTheme.secondaryText)
             }
         }
     }
@@ -319,16 +339,16 @@ struct ContentView: View {
     // MARK: - Qualität (Chip-Auswahl)
 
     private func qualitySection(_ info: VideoInfo) -> some View {
-        VStack(alignment: .leading, spacing: AppGlassSpacing.md) {
-            AppGlassSectionHeader(title: "Qualität")
+        VStack(alignment: .leading, spacing: AppSpacing.md) {
+            AppSectionHeader(title: "Qualität")
 
             if info.qualities.isEmpty {
                 Text("Beste verfügbare Qualität wird verwendet.")
-                    .font(AppGlassTypography.footnote)
-                    .foregroundStyle(AppGlassColors.textSecondary)
+                    .font(AppTypography.footnote)
+                    .foregroundStyle(AppTheme.secondaryText)
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: AppGlassSpacing.sm) {
+                    HStack(spacing: AppSpacing.sm) {
                         ForEach(info.qualities) { quality in
                             QualityChip(
                                 label: quality.label,
@@ -347,12 +367,13 @@ struct ContentView: View {
     // MARK: - Download
 
     private var downloadButton: some View {
-        Button {
+        AppButton(
+            title: "Download starten",
+            kind: .primary,
+            systemImage: "arrow.down.circle.fill"
+        ) {
             enqueueDownload()
-        } label: {
-            Label("Download starten", systemImage: "arrow.down.circle.fill")
         }
-        .buttonStyle(GlassPrimaryButtonStyle())
     }
 
     // MARK: - Vorschau-Player Sheet
@@ -361,7 +382,7 @@ struct ContentView: View {
     private var previewPlayerSheet: some View {
         if let url = info?.previewURL {
             ZStack {
-                AppGlassColors.bgDeep.ignoresSafeArea()
+                AppTheme.background.ignoresSafeArea()
                 VideoPlayer(player: AVPlayer(url: url))
                     .ignoresSafeArea()
             }
@@ -371,8 +392,8 @@ struct ContentView: View {
             ZStack {
                 AppGlassBackground()
                 Text("Für dieses Video ist keine Vorschau verfügbar.")
-                    .font(AppGlassTypography.body)
-                    .foregroundStyle(AppGlassColors.textSecondary)
+                    .font(AppTypography.body)
+                    .foregroundStyle(AppTheme.secondaryText)
                     .padding()
             }
         }
@@ -531,19 +552,19 @@ private struct QualityChip: View {
     var body: some View {
         Button(action: onTap) {
             Text(label)
-                .font(.subheadline.weight(isSelected ? .semibold : .regular))
-                .foregroundStyle(isSelected ? .white : AppGlassColors.textSecondary)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
+                .font(AppTypography.footnote.weight(isSelected ? .semibold : .regular))
+                .foregroundStyle(isSelected ? .white : AppTheme.secondaryText)
+                .padding(.horizontal, AppSpacing.md)
+                .padding(.vertical, AppSpacing.sm)
                 .background(
                     Capsule()
-                        .fill(isSelected ? AppGlassColors.accentPrimary : AppGlassColors.glassSurfaceStrong)
-                        .shadow(color: isSelected ? AppGlassColors.accentGlow : .clear, radius: 8, x: 0, y: 4)
+                        .fill(isSelected ? AppTheme.accent : AppColorsPremium.glassSurfaceStrong)
+                        .shadow(color: isSelected ? AppColorsPremium.accentGlow : .clear, radius: 8, x: 0, y: 4)
                 )
                 .overlay(
                     Capsule()
                         .stroke(
-                            isSelected ? AppGlassColors.accentPrimary.opacity(0.5) : AppGlassColors.glassBorder,
+                            isSelected ? AppTheme.accent.opacity(0.5) : AppColorsPremium.glassBorder,
                             lineWidth: 1
                         )
                 )
