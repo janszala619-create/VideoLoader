@@ -292,7 +292,7 @@ struct ServerAPI {
             let source = dto.formats.first {
                 Self.parseHeight($0.quality ?? $0.label) == height
             }
-            QualityOption(
+            return QualityOption(
                 id: "h\(height)",
                 label: "\(height)p",
                 height: height,
