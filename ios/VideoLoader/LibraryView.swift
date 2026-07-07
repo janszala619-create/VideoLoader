@@ -75,6 +75,7 @@ struct LibraryView: View {
                             Image(systemName: "ellipsis.circle")
                                 .foregroundStyle(AppTheme.primaryText)
                         }
+                        .accessibilityLabel("Weitere Optionen")
                     }
                 }
             }
@@ -92,7 +93,7 @@ struct LibraryView: View {
                         Image(systemName: "xmark.circle.fill")
                             .font(.title)
                             .foregroundStyle(.white, .black.opacity(0.5))
-                            .padding()
+                            .padding(AppSpacing.lg)
                     }
                     .accessibilityLabel("Player schließen")
                 }
@@ -171,7 +172,7 @@ struct LibraryView: View {
 
             Text(totalSizeText)
                 .font(AppTypography.subtitle)
-                .foregroundStyle(AppTheme.primaryText)
+                .foregroundStyle(AppTheme.info)
         }
     }
 

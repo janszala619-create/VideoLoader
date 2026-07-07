@@ -11,8 +11,19 @@ struct EmptyStateView: View {
     var body: some View {
         VStack(spacing: AppSpacing.lg) {
             Image(systemName: systemImage)
-                .font(.system(size: 48))
-                .foregroundStyle(AppTheme.accent.opacity(0.6))
+                .font(.system(size: 36))
+                .foregroundStyle(AppTheme.accent)
+                .frame(width: 88, height: 88)
+                .background(
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [AppTheme.accent.opacity(0.22), AppTheme.accent.opacity(0.05)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                )
 
             VStack(spacing: AppSpacing.sm) {
                 Text(title)

@@ -18,7 +18,7 @@ struct QualityOptionRow: View {
                             .foregroundStyle(AppTheme.primaryText)
 
                         if isRecommended {
-                            AppBadge(text: "Empfohlen", tint: AppTheme.accent)
+                            AppBadge(text: "Empfohlen", tint: AppTheme.special)
                         }
                     }
 

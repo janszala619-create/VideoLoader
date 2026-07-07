@@ -177,7 +177,7 @@ struct ContentView: View {
         } label: {
             HStack(spacing: AppSpacing.xs) {
                 AppStatusDot(
-                    color: serverOnline == true ? AppTheme.success :
+                    color: serverOnline == true ? AppTheme.info :
                         serverOnline == false ? AppTheme.danger :
                         AppTheme.secondaryText.opacity(0.6),
                     diameter: 7
@@ -189,7 +189,7 @@ struct ContentView: View {
                     .foregroundStyle(AppTheme.secondaryText)
             }
             .padding(.horizontal, AppSpacing.sm)
-            .padding(.vertical, AppSpacing.xs + 3)
+            .padding(.vertical, AppSpacing.sm)
             .background(
                 Capsule()
                     .fill(AppColorsPremium.glassSurfaceStrong)
@@ -386,13 +386,11 @@ struct ContentView: View {
             )
 
             if info.qualities.isEmpty {
-                AppCard {
-                    EmptyStateView(
-                        systemImage: "checkmark.seal",
-                        title: "Automatische Qualität",
-                        message: "Für dieses Video bietet der Server nur eine Version an. Wir laden automatisch die beste verfügbare Qualität herunter."
-                    )
-                }
+                EmptyStateView(
+                    systemImage: "checkmark.seal",
+                    title: "Automatische Qualität",
+                    message: "Für dieses Video bietet der Server nur eine Version an. Wir laden automatisch die beste verfügbare Qualität herunter."
+                )
             } else {
                 AppCard {
                     VStack(spacing: AppSpacing.sm) {
@@ -440,7 +438,7 @@ struct ContentView: View {
                 Text("Für dieses Video ist keine Vorschau verfügbar.")
                     .font(AppTypography.body)
                     .foregroundStyle(AppTheme.secondaryText)
-                    .padding()
+                    .padding(AppSpacing.lg)
             }
         }
     }

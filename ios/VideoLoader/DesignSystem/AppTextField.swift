@@ -11,6 +11,8 @@ struct AppTextField: View {
     var autocapitalization: TextInputAutocapitalization = .never
     var disablesAutocorrection: Bool = true
 
+    @FocusState private var isFocused: Bool
+
     var body: some View {
         VStack(alignment: .leading, spacing: AppSpacing.sm) {
             if let label {
@@ -22,7 +24,7 @@ struct AppTextField: View {
             HStack(spacing: AppSpacing.sm) {
                 if let systemImage {
                     Image(systemName: systemImage)
-                        .foregroundStyle(AppTheme.secondaryText)
+                        .foregroundStyle(isFocused ? AppTheme.accent : AppTheme.secondaryText)
                 }
                 TextField(placeholder, text: $text)
                     .font(AppTypography.body)
@@ -30,6 +32,7 @@ struct AppTextField: View {
                     .keyboardType(keyboardType)
                     .textInputAutocapitalization(autocapitalization)
                     .autocorrectionDisabled(disablesAutocorrection)
+                    .focused($isFocused)
             }
             .padding(.horizontal, AppSpacing.md)
             .frame(minHeight: 44)
@@ -39,7 +42,7 @@ struct AppTextField: View {
             )
             .overlay(
                 RoundedRectangle(cornerRadius: AppRadius.md, style: .continuous)
-                    .stroke(AppColorsPremium.glassBorder, lineWidth: 1)
+                    .stroke(isFocused ? AppTheme.accent : AppColorsPremium.glassBorder, lineWidth: isFocused ? 1.5 : 1)
             )
         }
     }

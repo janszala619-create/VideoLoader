@@ -18,4 +18,10 @@ enum AppTheme {
     static let success = AppColorsPremium.success
     static let warning = AppColorsPremium.warning
     static let danger = AppColorsPremium.error
+
+    // MARK: - Sekundäre/Informative & besondere Akzente
+    /// Teal – für sekundäre, informative Elemente (z. B. Serverstatus, Übersichts-Kennzahlen).
+    static let info = AppColorsPremium.accentTeal
+    /// Violett – bewusst sparsam für besondere Momente (z. B. „Empfohlen“-Badge).
+    static let special = AppColorsPremium.accentViolet
 }
