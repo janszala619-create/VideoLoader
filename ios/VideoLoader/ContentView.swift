@@ -336,7 +336,7 @@ struct ContentView: View {
         }
     }
 
-    // MARK: - Qualität (Chip-Auswahl)
+    // MARK: - Qualität
 
     private func qualitySection(_ info: VideoInfo) -> some View {
         VStack(alignment: .leading, spacing: AppSpacing.md) {
@@ -347,18 +347,17 @@ struct ContentView: View {
                     .font(AppTypography.footnote)
                     .foregroundStyle(AppTheme.secondaryText)
             } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: AppSpacing.sm) {
+                AppCard {
+                    VStack(spacing: AppSpacing.sm) {
                         ForEach(info.qualities) { quality in
-                            QualityChip(
-                                label: quality.label,
-                                isSelected: selectedQuality?.id == quality.id
-                            ) {
-                                selectedQuality = quality
-                            }
+                            QualityOptionRow(
+                                title: quality.label,
+                                isSelected: selectedQuality?.id == quality.id,
+                                isRecommended: quality.id == info.qualities.first?.id,
+                                onSelect: { selectedQuality = quality }
+                            )
                         }
                     }
-                    .padding(.vertical, 2)
                 }
             }
         }
@@ -539,38 +538,6 @@ struct ContentView: View {
             print("[VideoLoader] warning=VidSave legacy server mode is active")
         }
         #endif
-    }
-}
-
-// MARK: - Qualitäts-Chip
-
-private struct QualityChip: View {
-    let label: String
-    let isSelected: Bool
-    let onTap: () -> Void
-
-    var body: some View {
-        Button(action: onTap) {
-            Text(label)
-                .font(AppTypography.footnote.weight(isSelected ? .semibold : .regular))
-                .foregroundStyle(isSelected ? .white : AppTheme.secondaryText)
-                .padding(.horizontal, AppSpacing.md)
-                .padding(.vertical, AppSpacing.sm)
-                .background(
-                    Capsule()
-                        .fill(isSelected ? AppTheme.accent : AppColorsPremium.glassSurfaceStrong)
-                        .shadow(color: isSelected ? AppColorsPremium.accentGlow : .clear, radius: 8, x: 0, y: 4)
-                )
-                .overlay(
-                    Capsule()
-                        .stroke(
-                            isSelected ? AppTheme.accent.opacity(0.5) : AppColorsPremium.glassBorder,
-                            lineWidth: 1
-                        )
-                )
-        }
-        .buttonStyle(.plain)
-        .animation(.easeOut(duration: 0.15), value: isSelected)
     }
 }
 
