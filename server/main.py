@@ -11,6 +11,7 @@ import traceback
 import uuid
 from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import unquote as urllib_unquote
 
 import yt_dlp
 from fastapi import FastAPI, HTTPException, Request
@@ -122,6 +123,24 @@ def _safe_url(url: str, max_length: int = 160) -> str:
 
 def _sanitize_log_text(text: str) -> str:
     return re.sub(r"https?://[^\s)]+", lambda match: _safe_url(match.group(0)), text)
+
+
+def _raw_query_param(request: Request | None, name: str) -> str | None:
+    """Read a query parameter from the raw query string instead of FastAPI's
+    parsed value. FastAPI/Starlette decode query values with parse_qsl
+    semantics, which turns a literal "+" into a space. yt-dlp format
+    selectors (format_id) can legitimately contain "+" (e.g. "137+bestaudio")
+    but never a literal space, so that decoding would silently corrupt them.
+    Only %XX sequences are unescaped here, "+" is left untouched.
+    """
+    if request is None:
+        return None
+    raw = request.scope.get("query_string", b"").decode("utf-8", "replace")
+    for part in raw.split("&"):
+        key, _, value = part.partition("=")
+        if urllib_unquote(key, errors="replace") == name:
+            return urllib_unquote(value, errors="replace")
+    return None
 
 
 def _validate_video_url(url: str) -> str:
@@ -245,6 +264,9 @@ def api_info(
     url: str,
     request: Request = None,
 ):
+    raw_url = _raw_query_param(request, "url")
+    if raw_url is not None:
+        url = raw_url
     if _is_server_api_url(url, request):
         logger.warning("VideoLoader /api/info rejected_server_url url=%s", _safe_url(url))
         return _invalid_video_url_response()
@@ -556,6 +578,12 @@ def api_download(
     request: Request = None,
 ):
     request_id = uuid.uuid4().hex[:12]
+    raw_url = _raw_query_param(request, "url")
+    if raw_url is not None:
+        url = raw_url
+    raw_format_id = _raw_query_param(request, "format_id")
+    if raw_format_id is not None:
+        format_id = raw_format_id
     if _is_server_api_url(url, request):
         logger.warning(
             "VideoLoader /api/download rejected_server_url request_id=%s url=%s",
