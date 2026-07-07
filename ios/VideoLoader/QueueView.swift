@@ -27,13 +27,14 @@ struct QueueView: View {
             }
             .padding(.horizontal, AppGlassTheme.screenPadding)
             .padding(.top, AppGlassSpacing.md)
+            .padding(.bottom, 110)
             .background(AppGlassBackground())
             .navigationTitle("Downloads")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 if queue.jobs.contains(where: { $0.status == .done || $0.status == .failed }) {
                     ToolbarItem(placement: .topBarTrailing) {
-                        Button("Aufräumen") { queue.clearFinished() }
+                        Button("Abgeschlossene entfernen") { queue.clearFinished() }
                             .foregroundStyle(AppGlassColors.textPrimary)
                     }
                 }
@@ -44,7 +45,7 @@ struct QueueView: View {
     private var heroCard: some View {
         AppGlassHeroCard(
             title: "Warteschlange",
-            subtitle: "\(queue.jobs.count) Einträge insgesamt"
+            subtitle: queueSummary
         ) {
                 Text("\(queue.jobs.filter { $0.status == .running || $0.status == .waiting }.count) aktiv")
                     .font(AppGlassTypography.subheadline)
@@ -60,6 +61,13 @@ struct QueueView: View {
                             .stroke(AppGlassColors.glassBorder, lineWidth: 1)
                     )
         }
+    }
+
+    private var queueSummary: String {
+        let active = queue.jobs.filter { $0.status == .running || $0.status == .waiting }.count
+        let done = queue.jobs.filter { $0.status == .done }.count
+        let failed = queue.jobs.filter { $0.status == .failed }.count
+        return "\(active) aktiv · \(done) abgeschlossen · \(failed) fehlgeschlagen"
     }
 
     private func row(_ job: DownloadJob) -> some View {
@@ -102,9 +110,12 @@ struct QueueView: View {
             if job.progress > 0 {
                 ProgressView(value: job.progress)
                     .tint(AppGlassColors.accentPrimary)
+                    .accessibilityLabel("Download-Fortschritt")
+                    .accessibilityValue("\(Int(job.progress * 100)) Prozent heruntergeladen")
                 Text("\(Int(job.progress * 100)) % heruntergeladen")
                     .font(AppGlassTypography.footnote)
                     .foregroundStyle(AppGlassColors.textSecondary)
+                cancelButton(job)
             } else {
                 HStack(spacing: AppGlassSpacing.sm) {
                     ProgressView()
@@ -113,9 +124,10 @@ struct QueueView: View {
                         .font(AppGlassTypography.footnote)
                         .foregroundStyle(AppGlassColors.textSecondary)
                 }
+                cancelButton(job)
             }
         case .done:
-            Text("Das Video liegt jetzt in „Meine Videos“ und kann dort abgespielt oder geteilt werden.")
+            Text("Abgeschlossen · In Bibliothek gespeichert")
                 .font(AppGlassTypography.footnote)
                 .foregroundStyle(AppGlassColors.success)
         case .failed:
@@ -127,6 +139,15 @@ struct QueueView: View {
                 action: { queue.retry(job) }
             )
         }
+    }
+
+    private func cancelButton(_ job: DownloadJob) -> some View {
+        Button {
+            queue.remove(job)
+        } label: {
+            Label("Abbrechen", systemImage: "xmark.circle")
+        }
+        .buttonStyle(GlassSecondaryButtonStyle())
     }
 
     @ViewBuilder

@@ -41,7 +41,7 @@ struct ServerAPI {
             trimmed = "http://" + trimmed
         }
         guard let components = URLComponents(string: trimmed) else { throw APIError.badURL }
-        if Self.containsServerAPIPath(components.path) || Self.looksLikeVideoURL(trimmed) {
+        if Self.containsServerAPIPath(components.path) || Self.looksLikeKnownVideoPage(trimmed) {
             throw APIError.server(Self.videoURLInServerFieldMessage)
         }
         return components
@@ -76,10 +76,12 @@ struct ServerAPI {
         do {
             let dto = try decoder.decode(VideoLoaderInfoDTO.self, from: data)
 
-            var qualities = dto.heights.map {
-                QualityOption(id: "h\($0)", label: "\($0)p", height: $0, formatId: nil)
-            }
-            qualities.append(QualityOption(id: "auto", label: "Automatisch (beste Qualität)", height: nil, formatId: nil))
+            var qualities = dto.heights
+                .sorted(by: >)
+                .map {
+                    QualityOption(id: "h\($0)", label: "\($0)p", height: $0, formatId: nil)
+                }
+            qualities.append(QualityOption(id: "auto", label: "Automatisch", height: nil, formatId: nil))
 
             return VideoInfo(
                 title: dto.title,
@@ -195,7 +197,7 @@ struct ServerAPI {
         if let baseHost = baseComponents.host?.lowercased(), videoHost == baseHost {
             throw APIError.server(Self.videoURLInServerFieldMessage)
         }
-        guard Self.looksLikeVideoURL(trimmed) else { throw APIError.badURL }
+        guard Self.looksLikeWebURL(trimmed) else { throw APIError.badURL }
     }
 
     private static func containsServerAPIPath(_ text: String) -> Bool {
@@ -207,7 +209,16 @@ struct ServerAPI {
             lowercased.hasSuffix("/health")
     }
 
-    private static func looksLikeVideoURL(_ text: String) -> Bool {
+    private static func looksLikeWebURL(_ text: String) -> Bool {
+        guard let components = URLComponents(string: text),
+              let scheme = components.scheme?.lowercased(),
+              let host = components.host,
+              ["http", "https"].contains(scheme),
+              host.contains(".") else { return false }
+        return true
+    }
+
+    private static func looksLikeKnownVideoPage(_ text: String) -> Bool {
         guard let components = URLComponents(string: text),
               let host = components.host?.lowercased() else { return false }
         return host.contains("youtube.com") ||
@@ -252,21 +263,16 @@ struct ServerAPI {
     }
 
     private static func vidSaveLabel(_ f: VidSaveInfoDTO.Format) -> String {
-        var parts: [String] = []
         if let label = f.label, !label.isEmpty {
-            parts.append(label)
-        } else if let quality = f.quality, !quality.isEmpty {
-            parts.append(quality)
-        } else if let ext = f.ext, !ext.isEmpty {
-            parts.append(ext.uppercased())
-        } else {
-            parts.append(f.formatId)
+            return label
         }
-        if let size = f.filesize, size > 0 {
-            let mb = Double(size) / 1_048_576
-            parts.append(String(format: "≈ %.0f MB", mb))
+        if let quality = f.quality, !quality.isEmpty {
+            return quality
         }
-        return parts.joined(separator: " · ")
+        if let ext = f.ext, !ext.isEmpty {
+            return ext.uppercased()
+        }
+        return f.formatId
     }
 
     private static func videoInfo(from dto: VidSaveInfoDTO) -> VideoInfo {
@@ -283,11 +289,18 @@ struct ServerAPI {
             )
         ]
         qualities += uniqueHeights.map { height in
+            let source = dto.formats.first {
+                Self.parseHeight($0.quality ?? $0.label) == height
+            }
             QualityOption(
                 id: "h\(height)",
                 label: "\(height)p",
                 height: height,
-                formatId: "h\(height)"
+                formatId: "h\(height)",
+                container: source?.ext,
+                estimatedSize: source?.filesize,
+                isAudioOnly: source?.quality?.localizedCaseInsensitiveContains("audio") == true ||
+                    source?.label?.localizedCaseInsensitiveContains("audio") == true
             )
         }
 
@@ -297,7 +310,11 @@ struct ServerAPI {
                     id: firstFormat.formatId,
                     label: Self.vidSaveLabel(firstFormat),
                     height: Self.parseHeight(firstFormat.quality ?? firstFormat.label),
-                    formatId: firstFormat.formatId
+                    formatId: firstFormat.formatId,
+                    container: firstFormat.ext,
+                    estimatedSize: firstFormat.filesize,
+                    isAudioOnly: firstFormat.quality?.localizedCaseInsensitiveContains("audio") == true ||
+                        firstFormat.label?.localizedCaseInsensitiveContains("audio") == true
                 )
             )
         }
