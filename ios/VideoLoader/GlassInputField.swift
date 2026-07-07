@@ -10,7 +10,9 @@ struct GlassInputField<Accessory: View>: View {
     var textContentType: UITextContentType?
     var autocapitalization: TextInputAutocapitalization
     var disablesAutocorrection: Bool
+    var isError: Bool
     @ViewBuilder var accessory: Accessory
+    @FocusState private var isFocused: Bool
 
     init(
         label: String,
@@ -21,6 +23,7 @@ struct GlassInputField<Accessory: View>: View {
         textContentType: UITextContentType? = nil,
         autocapitalization: TextInputAutocapitalization = .sentences,
         disablesAutocorrection: Bool = false,
+        isError: Bool = false,
         @ViewBuilder accessory: () -> Accessory
     ) {
         self.label = label
@@ -31,6 +34,7 @@ struct GlassInputField<Accessory: View>: View {
         self.textContentType = textContentType
         self.autocapitalization = autocapitalization
         self.disablesAutocorrection = disablesAutocorrection
+        self.isError = isError
         self.accessory = accessory()
     }
 
@@ -48,6 +52,8 @@ struct GlassInputField<Accessory: View>: View {
                     .textContentType(textContentType)
                     .textInputAutocapitalization(autocapitalization)
                     .autocorrectionDisabled(disablesAutocorrection)
+                    .focused($isFocused)
+                    .accessibilityLabel(label)
 
                 accessory
             }
@@ -59,15 +65,21 @@ struct GlassInputField<Accessory: View>: View {
             )
             .overlay(
                 RoundedRectangle(cornerRadius: AppGlassTheme.radiusMedium, style: .continuous)
-                    .stroke(AppGlassColors.glassBorder, lineWidth: 1)
+                    .stroke(borderColor, lineWidth: isFocused || isError ? 1.5 : 1)
             )
 
             if let helperText {
                 Text(helperText)
                     .font(AppGlassTypography.footnote)
-                    .foregroundStyle(AppGlassColors.textSecondary)
+                    .foregroundStyle(isError ? AppGlassColors.warning : AppGlassColors.textSecondary)
             }
         }
+    }
+
+    private var borderColor: Color {
+        if isError { return AppGlassColors.warning.opacity(0.75) }
+        if isFocused { return AppGlassColors.accentPrimary.opacity(0.72) }
+        return AppGlassColors.glassBorder
     }
 }
 
@@ -81,7 +93,8 @@ extension GlassInputField where Accessory == EmptyView {
         keyboardType: UIKeyboardType = .default,
         textContentType: UITextContentType? = nil,
         autocapitalization: TextInputAutocapitalization = .sentences,
-        disablesAutocorrection: Bool = false
+        disablesAutocorrection: Bool = false,
+        isError: Bool = false
     ) {
         self.init(
             label: label,
@@ -92,6 +105,7 @@ extension GlassInputField where Accessory == EmptyView {
             textContentType: textContentType,
             autocapitalization: autocapitalization,
             disablesAutocorrection: disablesAutocorrection,
+            isError: isError,
             accessory: { EmptyView() }
         )
     }

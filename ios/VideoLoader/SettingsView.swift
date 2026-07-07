@@ -13,6 +13,10 @@ struct SettingsView: View {
     private static let defaultLocalServerURL = "http://100.80.105.62:9876"
     private static let defaultCloudServerURL = "http://158.101.168.11:8765"
 
+    private var activeServer: ServerKind {
+        ServerKind(rawValue: activeServerRaw) ?? .videoLoader
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -51,14 +55,9 @@ struct SettingsView: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: AppGlassSpacing.sm) {
-            Text("Verbindung")
-                .font(AppGlassTypography.largeTitle)
-                .foregroundStyle(AppGlassColors.textPrimary)
-            Text("Wähle den Server, der am zuverlässigsten zu deinem Setup passt.")
-                .font(AppGlassTypography.body)
-                .foregroundStyle(AppGlassColors.textSecondary)
-        }
+        Text("Wähle den Server, der am zuverlässigsten zu deinem Setup passt. Der lokale Server ist für YouTube meist die beste Wahl.")
+            .font(AppGlassTypography.body)
+            .foregroundStyle(AppGlassColors.textSecondary)
     }
 
     private var activeServerCard: some View {
@@ -71,6 +70,10 @@ struct SettingsView: View {
             }
             .pickerStyle(.segmented)
             .tint(AppGlassColors.accentPrimary)
+
+            Text(activeServer.settingsHint)
+                .font(AppGlassTypography.footnote)
+                .foregroundStyle(AppGlassColors.textSecondary)
         }
     }
 
@@ -82,21 +85,17 @@ struct SettingsView: View {
         kind: ServerKind
     ) -> some View {
         GlassCard {
-            HStack(alignment: .top, spacing: AppGlassSpacing.md) {
-                VStack(alignment: .leading, spacing: AppGlassSpacing.sm) {
-                    Text(title)
-                        .font(AppGlassTypography.headline)
-                        .foregroundStyle(AppGlassColors.textPrimary)
-                    Text(subtitle)
-                        .font(AppGlassTypography.footnote)
-                        .foregroundStyle(AppGlassColors.textSecondary)
-                    Text(url.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Keine URL hinterlegt" : url)
-                        .font(AppGlassTypography.caption)
-                        .foregroundStyle(AppGlassColors.textTertiary)
-                        .lineLimit(2)
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: AppGlassSpacing.md) {
+                    connectionText(title: title, subtitle: subtitle, url: url)
+                    Spacer(minLength: AppGlassSpacing.sm)
+                    statusPill(status, kind: kind)
                 }
-                Spacer(minLength: AppGlassSpacing.sm)
-                statusPill(status, kind: kind)
+
+                VStack(alignment: .leading, spacing: AppGlassSpacing.md) {
+                    connectionText(title: title, subtitle: subtitle, url: url)
+                    statusPill(status, kind: kind)
+                }
             }
 
             Button {
@@ -107,6 +106,22 @@ struct SettingsView: View {
             }
             .buttonStyle(GlassSecondaryButtonStyle())
             .disabled(status == .testing)
+        }
+    }
+
+    private func connectionText(title: String, subtitle: String, url: String) -> some View {
+        VStack(alignment: .leading, spacing: AppGlassSpacing.sm) {
+            Text(title)
+                .font(AppGlassTypography.headline)
+                .foregroundStyle(AppGlassColors.textPrimary)
+            Text(subtitle)
+                .font(AppGlassTypography.footnote)
+                .foregroundStyle(AppGlassColors.textSecondary)
+            Text(url.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Keine URL hinterlegt" : url)
+                .font(AppGlassTypography.caption)
+                .foregroundStyle(AppGlassColors.textTertiary)
+                .lineLimit(2)
+                .textSelection(.enabled)
         }
     }
 
@@ -171,19 +186,7 @@ struct SettingsView: View {
     }
 
     private func statusPill(_ status: ConnectionStatus, kind: ServerKind) -> some View {
-        HStack(spacing: AppGlassSpacing.xs) {
-            Image(systemName: status.iconName)
-                .font(.caption.weight(.semibold))
-            Text(status.title(for: kind))
-                .font(.caption.weight(.semibold))
-        }
-        .foregroundStyle(status.tint)
-        .padding(.horizontal, AppGlassSpacing.md)
-        .padding(.vertical, AppGlassSpacing.sm)
-        .background(
-            Capsule()
-                .fill(status.tint.opacity(0.14))
-        )
+        GlassPill(title: status.title(for: kind), systemImage: status.iconName, tint: status.tint)
         .accessibilityLabel(status.accessibilityLabel(for: kind))
     }
 

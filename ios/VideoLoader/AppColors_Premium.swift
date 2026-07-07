@@ -14,17 +14,17 @@ enum AppColorsPremium {
     static let auroraViolet = Color(hex: 0x8B5CF6)   // Violett, tiefgreifend
 
     // MARK: - Glass Surfaces
-    static let glassSurface = Color.white.opacity(0.04)
-    static let glassSurfaceStrong = Color.white.opacity(0.07)
-    static let glassHighlight = Color.white.opacity(0.16)
-    static let glassBorder = Color.white.opacity(0.10)
+    static let glassSurface = Color.white.opacity(0.05)
+    static let glassSurfaceStrong = Color.white.opacity(0.09)
+    static let glassHighlight = Color.white.opacity(0.18)
+    static let glassBorder = Color.white.opacity(0.14)
     static let glassEdgeTop = Color.white.opacity(0.25)
     static let glassEdgeBottom = Color.white.opacity(0.05)
 
     // MARK: - Text (Cool-getönt, nicht warm)
     static let textPrimary = Color(hex: 0xF0F4FF)    // Weiß mit leichtem Blau-Ton
     static let textSecondary = Color(hex: 0xA8B5E0)  // Blau-getönt (nicht grau)
-    static let textTertiary = Color(hex: 0x6B7FA8)   // Dunkler, aber noch blau
+    static let textTertiary = Color(hex: 0x7E90BA)   // Dunkler, aber noch blau
 
     // MARK: - Primary Accent (Blau dominiert)
     static let accentBlue = Color(hex: 0x3B5BFF)          // Hauptakzent: Satt-Blau

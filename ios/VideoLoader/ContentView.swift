@@ -47,26 +47,27 @@ struct ContentView: View {
         !cleanedLink.isEmpty && Self.looksLikeWebURL(cleanedLink) && !isLoadingInfo
     }
 
+    private var hasTypedInvalidLink: Bool {
+        !cleanedLink.isEmpty && !Self.looksLikeWebURL(cleanedLink)
+    }
+
+    private var linkFieldHasError: Bool {
+        linkValidationMessage != nil || hasTypedInvalidLink
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: AppGlassTheme.sectionSpacing) {
-                    serverRow
                     linkInputSection
+                    serverRow
 
                     if let errorMessage {
                         GlassErrorStateView(
-                            title: "Aktion fehlgeschlagen",
+                            title: errorStateTitle,
                             message: errorMessage,
-                            actionTitle: "Einstellungen öffnen",
-                            action: { showSettings = true }
-                        )
-                    }
-
-                    if isLoadingInfo {
-                        GlassLoadingStateView(
-                            title: "Video wird geprüft",
-                            message: "Metadaten und verfügbare Qualitäten werden geladen."
+                            actionTitle: errorActionTitle,
+                            action: errorActionTitle == nil ? nil : { handleErrorAction() }
                         )
                     }
 
@@ -82,11 +83,15 @@ struct ContentView: View {
                         previewSection(info)
                         qualitySection(info)
                         downloadButton
+                    } else if isLoadingInfo {
+                        checkingPreviewPlaceholder
                     } else if !isLoadingInfo && errorMessage == nil {
                         GlassEmptyStateView(
                             title: "Noch kein Video ausgewählt",
-                            message: "Füge einen Video-Link ein, prüfe das Video und wähle anschließend die gewünschte Qualität. YouTube und weitere Quellen sind je nach Server verfügbar.",
-                            systemImage: "play.rectangle.on.rectangle"
+                            message: "Füge einen Video-Link ein, prüfe ihn und wähle anschließend die gewünschte Qualität.",
+                            systemImage: "play.rectangle.on.rectangle",
+                            actionTitle: clipboardHasLink ? "Aus Zwischenablage einfügen" : nil,
+                            action: clipboardHasLink ? { pasteFromClipboard() } : nil
                         )
                     }
                 }
@@ -175,24 +180,39 @@ struct ContentView: View {
         }
     }
 
-    // MARK: - Server Row (kompakt, kein eigener Abschnitt)
+    // MARK: - Server Row
 
     private var serverRow: some View {
-        HStack(spacing: AppGlassSpacing.md) {
-            Picker("", selection: $activeServerRaw) {
-                ForEach(ServerKind.allCases) { kind in
-                    Text(kind.label).tag(kind.rawValue)
+        VStack(alignment: .leading, spacing: AppGlassSpacing.sm) {
+            AppGlassSectionHeader(title: "Server")
+
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: AppGlassSpacing.md) {
+                    serverPicker
+                    serverStatusPill
+                }
+
+                VStack(alignment: .leading, spacing: AppGlassSpacing.sm) {
+                    serverPicker
+                    serverStatusPill
                 }
             }
-            .pickerStyle(.segmented)
-            .onChange(of: activeServerRaw) { _, _ in
-                info = nil
-                errorMessage = nil
-                logActiveServer()
-                Task { await checkServer() }
-            }
+        }
+    }
 
-            serverStatusPill
+    private var serverPicker: some View {
+        Picker("Aktiver Server", selection: $activeServerRaw) {
+            ForEach(ServerKind.allCases) { kind in
+                Text(kind.label).tag(kind.rawValue)
+            }
+        }
+        .pickerStyle(.segmented)
+        .tint(AppGlassColors.accentPrimary)
+        .onChange(of: activeServerRaw) { _, _ in
+            info = nil
+            errorMessage = nil
+            logActiveServer()
+            Task { await checkServer() }
         }
     }
 
@@ -249,10 +269,50 @@ struct ContentView: View {
         }
     }
 
-    // MARK: - Link-Eingabe (kein GlassCard-Wrapper)
+    private var errorStateTitle: String {
+        if errorMessage == Self.invalidVideoInputMessage {
+            return "Link prüfen"
+        }
+        if errorNeedsSettings {
+            return "Server prüfen"
+        }
+        return "Video konnte nicht geprüft werden"
+    }
+
+    private var errorActionTitle: String? {
+        if errorNeedsSettings {
+            return "Einstellungen öffnen"
+        }
+        if canCheckVideo {
+            return "Erneut prüfen"
+        }
+        return nil
+    }
+
+    private var errorNeedsSettings: Bool {
+        guard let errorMessage else { return false }
+        let lowercased = errorMessage.lowercased()
+        return lowercased.contains("server") ||
+            lowercased.contains("verbindung") ||
+            lowercased.contains("offline") ||
+            lowercased.contains("adresse") ||
+            lowercased.contains("url")
+    }
+
+    private func handleErrorAction() {
+        if errorNeedsSettings {
+            showSettings = true
+        } else {
+            Task { await loadInfo() }
+        }
+    }
+
+    // MARK: - Link-Eingabe
 
     private var linkInputSection: some View {
-        VStack(alignment: .leading, spacing: AppGlassSpacing.md) {
+        GlassCard {
+            AppGlassSectionHeader(title: "Video")
+
             GlassInputField(
                 label: "Video-Link",
                 placeholder: "Link hier einfügen",
@@ -260,7 +320,8 @@ struct ContentView: View {
                 keyboardType: .URL,
                 textContentType: .URL,
                 autocapitalization: .never,
-                disablesAutocorrection: true
+                disablesAutocorrection: true,
+                isError: linkFieldHasError
             ) {
                 if videoLink.isEmpty {
                     Button {
@@ -296,36 +357,78 @@ struct ContentView: View {
                     .foregroundStyle(AppGlassColors.warning)
             }
 
-            HStack(spacing: AppGlassSpacing.sm) {
-                Button {
-                    Task { await loadInfo() }
-                } label: {
-                    if isLoadingInfo {
-                        HStack(spacing: AppGlassSpacing.sm) {
-                            ProgressView()
-                                .tint(.white)
-                            Text("Video wird geprüft…")
-                        }
-                    } else {
-                        Label("Prüfen", systemImage: "magnifyingglass")
-                    }
-                }
-                .buttonStyle(GlassPrimaryButtonStyle())
-                .disabled(!canCheckVideo)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: AppGlassSpacing.sm) {
+                    checkVideoButton
 
-                if clipboardHasLink && videoLink.isEmpty {
-                    Button {
-                        pasteFromClipboard()
-                    } label: {
-                        Label("Einfügen", systemImage: "doc.on.clipboard")
+                    if clipboardHasLink && videoLink.isEmpty {
+                        pasteButton
                     }
-                    .buttonStyle(GlassSecondaryButtonStyle())
                 }
+
+                VStack(spacing: AppGlassSpacing.sm) {
+                    checkVideoButton
+
+                    if clipboardHasLink && videoLink.isEmpty {
+                        pasteButton
+                    }
+                }
+            }
+
+            if isLoadingInfo {
+                Label("Metadaten und verfügbare Qualitäten werden geladen.", systemImage: "hourglass")
+                    .font(AppGlassTypography.footnote)
+                    .foregroundStyle(AppGlassColors.textSecondary)
             }
         }
     }
 
+    private var checkVideoButton: some View {
+        Button {
+            Task { await loadInfo() }
+        } label: {
+            if isLoadingInfo {
+                HStack(spacing: AppGlassSpacing.sm) {
+                    ProgressView()
+                        .tint(.white)
+                    Text("Video wird geprüft")
+                }
+            } else {
+                Label("Prüfen", systemImage: "magnifyingglass")
+            }
+        }
+        .buttonStyle(GlassPrimaryButtonStyle())
+        .disabled(!canCheckVideo)
+    }
+
+    private var pasteButton: some View {
+        Button {
+            pasteFromClipboard()
+        } label: {
+            Label("Einfügen", systemImage: "doc.on.clipboard")
+        }
+        .buttonStyle(GlassSecondaryButtonStyle())
+    }
+
     // MARK: - Vorschau
+
+    private var checkingPreviewPlaceholder: some View {
+        GlassCard {
+            HStack(alignment: .top, spacing: AppGlassSpacing.md) {
+                ProgressView()
+                    .tint(AppGlassColors.accentPrimary)
+                    .frame(width: AppGlassTheme.minimumTouchTarget, height: AppGlassTheme.minimumTouchTarget)
+                VStack(alignment: .leading, spacing: AppGlassSpacing.xs) {
+                    Text("Video wird geprüft")
+                        .font(AppGlassTypography.headline)
+                        .foregroundStyle(AppGlassColors.textPrimary)
+                    Text("Gleich erscheinen Vorschau, Qualitätsauswahl und Download-Aktion.")
+                        .font(AppGlassTypography.footnote)
+                        .foregroundStyle(AppGlassColors.textSecondary)
+                }
+            }
+        }
+    }
 
     private func previewSection(_ info: VideoInfo) -> some View {
         VStack(alignment: .leading, spacing: AppGlassSpacing.md) {
@@ -334,7 +437,9 @@ struct ContentView: View {
             GlassCard {
                 ZStack {
                     AsyncImage(url: info.thumbnailURL) { image in
-                        image.resizable().aspectRatio(contentMode: .fit)
+                        image
+                            .resizable()
+                            .aspectRatio(16 / 9, contentMode: .fit)
                     } placeholder: {
                         Rectangle()
                             .fill(AppGlassColors.glassSurfaceStrong)
@@ -348,6 +453,13 @@ struct ContentView: View {
                     .clipShape(RoundedRectangle(cornerRadius: AppGlassTheme.radiusLarge, style: .continuous))
 
                     if info.previewURL != nil {
+                        LinearGradient(
+                            colors: [.clear, .black.opacity(0.45)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: AppGlassTheme.radiusLarge, style: .continuous))
+
                         Button {
                             showPreviewPlayer = true
                         } label: {
@@ -364,17 +476,29 @@ struct ContentView: View {
                     .font(AppGlassTypography.title3)
                     .foregroundStyle(AppGlassColors.textPrimary)
 
-                HStack(spacing: 12) {
-                    if let uploader = info.uploader {
-                        Label(uploader, systemImage: "person.circle")
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: AppGlassSpacing.md) {
+                        previewMetadata(info)
                     }
-                    if let duration = info.durationText {
-                        Label(duration, systemImage: "clock")
+
+                    VStack(alignment: .leading, spacing: AppGlassSpacing.sm) {
+                        previewMetadata(info)
                     }
                 }
                 .font(AppGlassTypography.subheadline)
                 .foregroundStyle(AppGlassColors.textSecondary)
             }
+        }
+    }
+
+    @ViewBuilder
+    private func previewMetadata(_ info: VideoInfo) -> some View {
+        if let uploader = info.uploader {
+            Label(uploader, systemImage: "person.circle")
+                .lineLimit(1)
+        }
+        if let duration = info.durationText {
+            Label(duration, systemImage: "clock")
         }
     }
 
@@ -391,9 +515,9 @@ struct ContentView: View {
                     message: "Die App verwendet beim Download die beste Qualität, die der aktive Server bereitstellt."
                 )
             } else {
-                Button {
+                GlassSurfaceButton(action: {
                     showQualityPicker = true
-                } label: {
+                }) {
                     HStack(spacing: AppGlassSpacing.md) {
                         VStack(alignment: .leading, spacing: AppGlassSpacing.xs) {
                             Text("Qualität auswählen")
@@ -408,18 +532,11 @@ struct ContentView: View {
                             .font(.footnote.weight(.semibold))
                             .foregroundStyle(AppGlassColors.textTertiary)
                     }
-                    .padding(AppGlassSpacing.lg)
-                    .background(
-                        RoundedRectangle(cornerRadius: AppGlassTheme.radiusLarge, style: .continuous)
-                            .fill(AppGlassColors.glassSurfaceStrong)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: AppGlassTheme.radiusLarge, style: .continuous)
-                            .stroke(AppGlassColors.glassBorder, lineWidth: 1)
-                    )
                 }
-                .buttonStyle(.plain)
                 .accessibilityLabel("Qualität auswählen")
+                .accessibilityValue(selectedQualitySummary)
+
+                qualityBadges
 
                 if info.hasLimitedQualities {
                     GlassStatusBanner(
@@ -445,6 +562,41 @@ struct ContentView: View {
         return detail.isEmpty ? selectedQuality.label : "\(selectedQuality.label) · \(detail)"
     }
 
+    @ViewBuilder
+    private var qualityBadges: some View {
+        if let selectedQuality {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: AppGlassSpacing.sm) {
+                    qualityBadgeContent(selectedQuality)
+                }
+                VStack(alignment: .leading, spacing: AppGlassSpacing.sm) {
+                    qualityBadgeContent(selectedQuality)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func qualityBadgeContent(_ quality: QualityOption) -> some View {
+        if quality.isAutomatic {
+            GlassPill(title: "Automatisch", systemImage: "sparkles", tint: AppGlassColors.accentPrimary)
+        } else if quality.isAudioOnly {
+            GlassPill(title: "Nur Audio", systemImage: "waveform", tint: AppGlassColors.accentSecondary)
+        } else {
+            GlassPill(title: "Video + Audio", systemImage: "film", tint: AppGlassColors.accentPrimary)
+        }
+        if let height = quality.height {
+            GlassPill(title: "\(height)p", systemImage: "rectangle", tint: AppGlassColors.textSecondary)
+        }
+        if let estimatedSize = quality.estimatedSize, estimatedSize > 0 {
+            GlassPill(
+                title: ByteCountFormatter.string(fromByteCount: Int64(estimatedSize), countStyle: .file),
+                systemImage: "internaldrive",
+                tint: AppGlassColors.textSecondary
+            )
+        }
+    }
+
     // MARK: - Download
 
     private var downloadButton: some View {
@@ -454,6 +606,7 @@ struct ContentView: View {
             Label("Download starten", systemImage: "arrow.down.circle.fill")
         }
         .buttonStyle(GlassPrimaryButtonStyle())
+        .accessibilityHint("Fügt das Video zur Download-Warteschlange hinzu.")
     }
 
     // MARK: - Vorschau-Player Sheet
@@ -674,7 +827,10 @@ private struct QualityPickerSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     private var recommended: QualityOption? {
-        info.qualities.first(where: { !$0.isAutomatic && !$0.isAudioOnly }) ??
+        info.qualities
+            .filter { !$0.isAutomatic && !$0.isAudioOnly }
+            .sorted { ($0.height ?? 0) > ($1.height ?? 0) }
+            .first ??
             info.qualities.first(where: { $0.isAutomatic }) ??
             info.qualities.first
     }
@@ -748,43 +904,66 @@ private struct QualityPickerSheet: View {
     }
 
     private func qualityRow(_ option: QualityOption) -> some View {
-        Button {
+        let isSelected = selectedQuality?.id == option.id
+
+        return GlassSurfaceButton(isSelected: isSelected, action: {
             selectedQuality = option
             preferredQualityID = option.id
             dismiss()
-        } label: {
+        }) {
             HStack(spacing: AppGlassSpacing.md) {
-                VStack(alignment: .leading, spacing: AppGlassSpacing.xs) {
+                VStack(alignment: .leading, spacing: AppGlassSpacing.sm) {
                     Text(option.label)
                         .font(AppGlassTypography.headline)
                         .foregroundStyle(AppGlassColors.textPrimary)
-                    Text(option.isAutomatic ? "Beste verfügbare Qualität" : option.detailText)
+
+                    Text(option.isAutomatic ? "Beste verfügbare Qualität des aktiven Servers" : option.detailText)
                         .font(AppGlassTypography.footnote)
                         .foregroundStyle(AppGlassColors.textSecondary)
+
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: AppGlassSpacing.sm) {
+                            qualityRowBadges(option)
+                        }
+                        VStack(alignment: .leading, spacing: AppGlassSpacing.sm) {
+                            qualityRowBadges(option)
+                        }
+                    }
                 }
-                Spacer()
-                if selectedQuality?.id == option.id {
+                Spacer(minLength: AppGlassSpacing.sm)
+                if isSelected {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(AppGlassColors.accentPrimary)
                         .font(.title3)
+                        .accessibilityHidden(true)
                 }
             }
-            .frame(minHeight: AppGlassTheme.controlHeight)
-            .padding(AppGlassSpacing.lg)
-            .background(
-                RoundedRectangle(cornerRadius: AppGlassTheme.radiusLarge, style: .continuous)
-                    .fill(AppGlassColors.glassSurfaceStrong)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: AppGlassTheme.radiusLarge, style: .continuous)
-                    .stroke(
-                        selectedQuality?.id == option.id ? AppGlassColors.accentPrimary.opacity(0.45) : AppGlassColors.glassBorder,
-                        lineWidth: 1
-                    )
+        }
+        .accessibilityLabel("\(option.label), \(option.isAutomatic ? "automatisch beste Qualität" : option.detailText)")
+        .accessibilityValue(isSelected ? "Ausgewählt" : "Nicht ausgewählt")
+    }
+
+    @ViewBuilder
+    private func qualityRowBadges(_ option: QualityOption) -> some View {
+        if option.isAutomatic {
+            GlassPill(title: "Automatisch", systemImage: "sparkles", tint: AppGlassColors.accentPrimary)
+        } else if option.isAudioOnly {
+            GlassPill(title: "Nur Audio", systemImage: "waveform", tint: AppGlassColors.accentSecondary)
+        } else {
+            GlassPill(title: "Video", systemImage: "film", tint: AppGlassColors.accentPrimary)
+        }
+
+        if let height = option.height {
+            GlassPill(title: "\(height)p", tint: AppGlassColors.textSecondary)
+        }
+
+        if let estimatedSize = option.estimatedSize, estimatedSize > 0 {
+            GlassPill(
+                title: ByteCountFormatter.string(fromByteCount: Int64(estimatedSize), countStyle: .file),
+                systemImage: "internaldrive",
+                tint: AppGlassColors.textSecondary
             )
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel("\(option.label), \(option.isAutomatic ? "automatisch beste Qualität" : option.detailText)")
     }
 }
 

@@ -2,6 +2,7 @@ import SwiftUI
 
 /// Zeigt die Download-Warteschlange mit Status (wartet / lädt / fertig / Fehler).
 struct QueueView: View {
+    @Binding var selectedTab: Int
     @ObservedObject private var queue = DownloadQueue.shared
 
     var body: some View {
@@ -13,8 +14,10 @@ struct QueueView: View {
                     if queue.jobs.isEmpty {
                         GlassEmptyStateView(
                             title: "Keine Downloads",
-                            message: "Füge im Tab „Laden“ ein Video hinzu. Mehrere Videos werden nacheinander abgearbeitet – auch wenn die App geschlossen ist.",
-                            systemImage: "arrow.down.circle"
+                            message: "Füge ein Video hinzu. Mehrere Downloads werden nacheinander abgearbeitet, auch wenn die App geschlossen ist.",
+                            systemImage: "arrow.down.circle",
+                            actionTitle: "Video laden",
+                            action: { selectedTab = 0 }
                         )
                     } else {
                         VStack(spacing: AppGlassSpacing.md) {
@@ -34,8 +37,15 @@ struct QueueView: View {
             .toolbar {
                 if queue.jobs.contains(where: { $0.status == .done || $0.status == .failed }) {
                     ToolbarItem(placement: .topBarTrailing) {
-                        Button("Abgeschlossene entfernen") { queue.clearFinished() }
-                            .foregroundStyle(AppGlassColors.textPrimary)
+                        Menu {
+                            Button("Abgeschlossene entfernen", systemImage: "checkmark.circle") {
+                                queue.clearFinished()
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis.circle")
+                                .foregroundStyle(AppGlassColors.textPrimary)
+                        }
+                        .accessibilityLabel("Download-Aktionen")
                     }
                 }
             }
@@ -47,19 +57,11 @@ struct QueueView: View {
             title: "Warteschlange",
             subtitle: queueSummary
         ) {
-                Text("\(queue.jobs.filter { $0.status == .running || $0.status == .waiting }.count) aktiv")
-                    .font(AppGlassTypography.subheadline)
-                    .foregroundStyle(AppGlassColors.textPrimary)
-                    .padding(.horizontal, AppGlassSpacing.md)
-                    .padding(.vertical, AppGlassSpacing.sm)
-                    .background(
-                        Capsule(style: .continuous)
-                            .fill(AppGlassColors.glassSurfaceStrong)
-                    )
-                    .overlay(
-                        Capsule(style: .continuous)
-                            .stroke(AppGlassColors.glassBorder, lineWidth: 1)
-                    )
+                GlassPill(
+                    title: "\(queue.jobs.filter { $0.status == .running || $0.status == .waiting }.count) aktiv",
+                    systemImage: "arrow.down.circle",
+                    tint: AppGlassColors.accentPrimary
+                )
         }
     }
 
@@ -75,6 +77,8 @@ struct QueueView: View {
             HStack(alignment: .top, spacing: AppGlassSpacing.md) {
                 statusIcon(job)
                     .font(.headline)
+                    .frame(width: AppGlassTheme.minimumTouchTarget, height: AppGlassTheme.minimumTouchTarget, alignment: .top)
+                    .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: AppGlassSpacing.xs) {
                     Text(job.title)
                         .font(AppGlassTypography.headline)
@@ -127,9 +131,17 @@ struct QueueView: View {
                 cancelButton(job)
             }
         case .done:
-            Text("Abgeschlossen · In Bibliothek gespeichert")
-                .font(AppGlassTypography.footnote)
-                .foregroundStyle(AppGlassColors.success)
+            VStack(alignment: .leading, spacing: AppGlassSpacing.md) {
+                Label("Abgeschlossen · In Bibliothek gespeichert", systemImage: "checkmark.circle.fill")
+                    .font(AppGlassTypography.footnote)
+                    .foregroundStyle(AppGlassColors.success)
+                Button {
+                    selectedTab = 2
+                } label: {
+                    Label("In Bibliothek öffnen", systemImage: "film.stack")
+                }
+                .buttonStyle(GlassSecondaryButtonStyle())
+            }
         case .failed:
             GlassStatusBanner(
                 tone: .error,
@@ -175,5 +187,5 @@ struct QueueView: View {
 }
 
 #Preview {
-    QueueView()
+    QueueView(selectedTab: .constant(1))
 }

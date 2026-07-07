@@ -31,6 +31,7 @@ struct GlassStatusBanner: View {
     let message: String
     var actionTitle: String?
     var action: (() -> Void)?
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppGlassSpacing.md) {
@@ -57,20 +58,24 @@ struct GlassStatusBanner: View {
 
             if let actionTitle, let action {
                 Button(actionTitle, action: action)
-                    .buttonStyle(.borderless)
-                    .font(AppGlassTypography.footnote.weight(.semibold))
-                    .foregroundStyle(tone.tint)
+                    .buttonStyle(GlassSecondaryButtonStyle())
             }
         }
         .padding(AppGlassSpacing.lg)
         .background(
             RoundedRectangle(cornerRadius: AppGlassTheme.radiusLarge, style: .continuous)
-                .fill(AppGlassColors.glassSurfaceStrong)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: AppGlassTheme.radiusLarge, style: .continuous))
+                .fill(reduceTransparency ? AppGlassColors.bgElevated : AppGlassColors.glassSurfaceStrong)
         )
+        .background {
+            if !reduceTransparency {
+                RoundedRectangle(cornerRadius: AppGlassTheme.radiusLarge, style: .continuous)
+                    .fill(.regularMaterial)
+            }
+        }
         .overlay(
             RoundedRectangle(cornerRadius: AppGlassTheme.radiusLarge, style: .continuous)
                 .stroke(tone.tint.opacity(0.22), lineWidth: 1)
         )
+        .accessibilityElement(children: actionTitle == nil ? .combine : .contain)
     }
 }

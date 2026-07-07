@@ -19,6 +19,7 @@ enum LibrarySort: String, CaseIterable, Identifiable {
 /// Bibliothek: zeigt alle in der App gespeicherten Videos.
 struct LibraryView: View {
     @Environment(\.openURL) private var openURL
+    @Binding var selectedTab: Int
     @State private var videos: [DownloadedVideo] = []
     @State private var selectedVideo: DownloadedVideo?
     @State private var feedback: String?
@@ -140,7 +141,9 @@ struct LibraryView: View {
             GlassEmptyStateView(
                 title: "Noch keine Videos gespeichert",
                 message: "Geladene Videos erscheinen hier und können abgespielt, geteilt oder in Fotos gespeichert werden.",
-                systemImage: "film.stack"
+                systemImage: "film.stack",
+                actionTitle: "Erstes Video laden",
+                action: { selectedTab = 0 }
             )
         } else if filteredVideos.isEmpty {
             GlassEmptyStateView(
@@ -177,70 +180,28 @@ struct LibraryView: View {
             title: "Mediathek",
             subtitle: "\(videos.count) Video\(videos.count == 1 ? "" : "s") · \(totalSizeText) belegt"
         ) {
-                Text(sort.label)
-                    .font(AppGlassTypography.subheadline)
-                    .foregroundStyle(AppGlassColors.textPrimary)
-                    .padding(.horizontal, AppGlassSpacing.md)
-                    .padding(.vertical, AppGlassSpacing.sm)
-                    .background(
-                        Capsule(style: .continuous)
-                            .fill(AppGlassColors.glassSurfaceStrong)
-                    )
-                    .overlay(
-                        Capsule(style: .continuous)
-                            .stroke(AppGlassColors.glassBorder, lineWidth: 1)
-                    )
+                GlassPill(title: sort.label, systemImage: "arrow.up.arrow.down", tint: AppGlassColors.textSecondary)
         }
     }
 
     private func row(_ video: DownloadedVideo) -> some View {
         GlassCard {
-            HStack(alignment: .top, spacing: AppGlassSpacing.md) {
-                VideoThumbnail(url: video.url)
-
-                VStack(alignment: .leading, spacing: AppGlassSpacing.xs) {
-                    Text(video.name)
-                        .font(AppGlassTypography.headline)
-                        .foregroundStyle(AppGlassColors.textPrimary)
-                        .lineLimit(2)
-                    Text("\(video.sizeText) · \(video.germanDateText)")
-                        .font(AppGlassTypography.footnote)
-                        .foregroundStyle(AppGlassColors.textSecondary)
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: AppGlassSpacing.md) {
+                    VideoThumbnail(url: video.url)
+                    videoText(video)
+                    Spacer(minLength: 0)
+                    videoActions(video)
                 }
 
-                Spacer(minLength: 0)
-
-                Menu {
-                    Button {
-                        selectedVideo = video
-                    } label: {
-                        Label("Abspielen", systemImage: "play.fill")
+                VStack(alignment: .leading, spacing: AppGlassSpacing.md) {
+                    VideoThumbnail(url: video.url)
+                    HStack(alignment: .top, spacing: AppGlassSpacing.md) {
+                        videoText(video)
+                        Spacer(minLength: 0)
+                        videoActions(video)
                     }
-                    ShareLink(item: video.url) {
-                        Label("Teilen", systemImage: "square.and.arrow.up")
-                    }
-                    Button {
-                        saveToPhotos(video)
-                    } label: {
-                        Label("In Fotos sichern", systemImage: "photo.badge.plus")
-                    }
-                    Button {
-                        startRename(video)
-                    } label: {
-                        Label("Umbenennen", systemImage: "pencil")
-                    }
-                    Button(role: .destructive) {
-                        remove(video)
-                    } label: {
-                        Label("Löschen", systemImage: "trash")
-                    }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                        .font(.title3)
-                        .foregroundStyle(AppGlassColors.textSecondary)
-                        .frame(width: AppGlassTheme.controlHeight, height: AppGlassTheme.controlHeight)
                 }
-                .accessibilityLabel("Aktionen für \(video.name)")
             }
         }
         .contentShape(Rectangle())
@@ -318,6 +279,53 @@ struct LibraryView: View {
             }
         }
     }
+
+    private func videoText(_ video: DownloadedVideo) -> some View {
+        VStack(alignment: .leading, spacing: AppGlassSpacing.xs) {
+            Text(video.name)
+                .font(AppGlassTypography.headline)
+                .foregroundStyle(AppGlassColors.textPrimary)
+                .lineLimit(2)
+            Text("\(video.sizeText) · \(video.germanDateText)")
+                .font(AppGlassTypography.footnote)
+                .foregroundStyle(AppGlassColors.textSecondary)
+        }
+        .layoutPriority(1)
+    }
+
+    private func videoActions(_ video: DownloadedVideo) -> some View {
+        Menu {
+            Button {
+                selectedVideo = video
+            } label: {
+                Label("Abspielen", systemImage: "play.fill")
+            }
+            ShareLink(item: video.url) {
+                Label("Teilen", systemImage: "square.and.arrow.up")
+            }
+            Button {
+                saveToPhotos(video)
+            } label: {
+                Label("In Fotos sichern", systemImage: "photo.badge.plus")
+            }
+            Button {
+                startRename(video)
+            } label: {
+                Label("Umbenennen", systemImage: "pencil")
+            }
+            Button(role: .destructive) {
+                remove(video)
+            } label: {
+                Label("Löschen", systemImage: "trash")
+            }
+        } label: {
+            Image(systemName: "ellipsis.circle")
+                .font(.title3)
+                .foregroundStyle(AppGlassColors.textSecondary)
+                .frame(width: AppGlassTheme.controlHeight, height: AppGlassTheme.controlHeight)
+        }
+        .accessibilityLabel("Aktionen für \(video.name)")
+    }
 }
 
 /// Erzeugt ein Vorschaubild aus der Videodatei.
@@ -377,5 +385,5 @@ struct VideoThumbnail: View {
 }
 
 #Preview {
-    LibraryView()
+    LibraryView(selectedTab: .constant(2))
 }

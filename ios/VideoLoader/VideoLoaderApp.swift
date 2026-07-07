@@ -21,13 +21,13 @@ struct VideoLoaderApp: App {
                         Label("Laden", systemImage: "arrow.down.circle")
                     }
                     .tag(0)
-                QueueView()
+                QueueView(selectedTab: $selectedTab)
                     .tabItem {
                         Label("Downloads", systemImage: "square.and.arrow.down")
                     }
                     .badge(activeCount)
                     .tag(1)
-                LibraryView()
+                LibraryView(selectedTab: $selectedTab)
                     .tabItem {
                         Label("Bibliothek", systemImage: "film.stack")
                     }

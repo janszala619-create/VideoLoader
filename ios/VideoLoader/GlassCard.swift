@@ -2,6 +2,7 @@ import SwiftUI
 
 struct GlassCard<Content: View>: View {
     @ViewBuilder let content: Content
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppGlassSpacing.md) {
@@ -10,23 +11,32 @@ struct GlassCard<Content: View>: View {
         .padding(AppGlassSpacing.lg)
         .background(
             RoundedRectangle(cornerRadius: AppGlassTheme.radiusLarge, style: .continuous)
-                .fill(AppGlassColors.glassSurface)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: AppGlassTheme.radiusLarge, style: .continuous))
+                .fill(reduceTransparency ? AppGlassColors.bgElevated : AppGlassColors.glassSurface)
         )
+        .background {
+            if !reduceTransparency {
+                RoundedRectangle(cornerRadius: AppGlassTheme.radiusLarge, style: .continuous)
+                    .fill(.regularMaterial)
+            }
+        }
         .overlay(
-            RoundedRectangle(cornerRadius: AppGlassTheme.radiusLarge, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            AppGlassColors.glassHighlight.opacity(0.10),
-                            Color.clear,
-                            AppGlassColors.accentGlow.opacity(0.10)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .allowsHitTesting(false)
+            Group {
+                if !reduceTransparency {
+                    RoundedRectangle(cornerRadius: AppGlassTheme.radiusLarge, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    AppGlassColors.glassHighlight.opacity(0.10),
+                                    Color.clear,
+                                    AppGlassColors.accentGlow.opacity(0.10)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                }
+            }
+            .allowsHitTesting(false)
         )
         .overlay(
             RoundedRectangle(cornerRadius: AppGlassTheme.radiusLarge, style: .continuous)
