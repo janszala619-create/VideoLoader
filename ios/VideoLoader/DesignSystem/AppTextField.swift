@@ -35,7 +35,7 @@ struct AppTextField: View {
                     .focused($isFocused)
             }
             .padding(.horizontal, AppSpacing.md)
-            .frame(minHeight: 44)
+            .frame(minHeight: AppSpacing.controlHeight)
             .background(
                 RoundedRectangle(cornerRadius: AppRadius.md, style: .continuous)
                     .fill(AppColorsPremium.glassSurfaceStrong)

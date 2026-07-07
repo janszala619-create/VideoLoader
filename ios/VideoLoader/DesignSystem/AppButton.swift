@@ -65,7 +65,7 @@ struct AppButton: View {
                 Text(title)
                     .font(AppTypography.bodyEmphasized)
             }
-            .frame(maxWidth: .infinity, minHeight: 44)
+            .frame(maxWidth: .infinity, minHeight: AppSpacing.controlHeight)
             .foregroundStyle(kind.foreground)
             .background(
                 RoundedRectangle(cornerRadius: AppRadius.md, style: .continuous)

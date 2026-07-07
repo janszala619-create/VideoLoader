@@ -202,7 +202,7 @@ struct LibraryView: View {
                 ShareLink(item: video.url) {
                     Label("Teilen", systemImage: "square.and.arrow.up")
                         .font(AppTypography.bodyEmphasized)
-                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .frame(maxWidth: .infinity, minHeight: AppSpacing.controlHeight)
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(AppTheme.primaryText)

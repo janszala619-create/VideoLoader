@@ -8,4 +8,7 @@ enum AppSpacing {
     static let lg: CGFloat = 16
     static let xl: CGFloat = 24
     static let xxl: CGFloat = 32
+
+    /// Mindesthöhe für Buttons, Eingabefelder und Icon-Touch-Targets.
+    static let controlHeight: CGFloat = 44
 }

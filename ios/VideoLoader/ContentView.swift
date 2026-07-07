@@ -238,7 +238,7 @@ struct ContentView: View {
                         Image(systemName: "doc.on.clipboard")
                             .foregroundStyle(AppTheme.secondaryText)
                     }
-                    .frame(width: 44, height: 44)
+                    .frame(width: AppSpacing.controlHeight, height: AppSpacing.controlHeight)
                     .accessibilityLabel("Link aus Zwischenablage einfügen")
                 } else {
                     Button {
@@ -249,7 +249,7 @@ struct ContentView: View {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundStyle(AppTheme.secondaryText)
                     }
-                    .frame(width: 44, height: 44)
+                    .frame(width: AppSpacing.controlHeight, height: AppSpacing.controlHeight)
                     .accessibilityLabel("Linkfeld leeren")
                 }
             }

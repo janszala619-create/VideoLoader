@@ -48,7 +48,7 @@ struct QualityOptionRow: View {
                     .foregroundStyle(isSelected ? AppTheme.accent : AppTheme.secondaryText.opacity(0.5))
             }
             .padding(.horizontal, AppSpacing.md)
-            .frame(minHeight: 44)
+            .frame(minHeight: AppSpacing.controlHeight)
             .background(
                 RoundedRectangle(cornerRadius: AppRadius.md, style: .continuous)
                     .fill(isSelected ? AppTheme.accent.opacity(0.12) : AppColorsPremium.glassSurfaceStrong)
