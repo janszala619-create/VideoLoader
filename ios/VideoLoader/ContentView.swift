@@ -229,22 +229,22 @@ struct ContentView: View {
 
     private var serverStatusTitle: String {
         switch serverOnline {
-        case true:
+        case .some(true):
             return activeServer == .videoLoader ? "Lokal online" : "Cloud online"
-        case false:
+        case .some(false):
             return "Server offline"
-        case nil:
+        case .none:
             return "Prüfen…"
         }
     }
 
     private var serverStatusAccessibilityLabel: String {
         switch serverOnline {
-        case true:
+        case .some(true):
             return activeServer == .videoLoader ? "Lokaler Server online" : "Cloud-Server online"
-        case false:
+        case .some(false):
             return "Server offline. Zum erneuten Prüfen doppeltippen."
-        case nil:
+        case .none:
             return "Serverstatus wird geprüft"
         }
     }
