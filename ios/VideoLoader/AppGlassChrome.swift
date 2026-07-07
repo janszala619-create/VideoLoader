@@ -30,38 +30,3 @@ struct AppGlassBackground: View {
         .ignoresSafeArea()
     }
 }
-
-struct AppGlassSectionHeader: View {
-    let title: String
-
-    var body: some View {
-        Text(title.uppercased())
-            .font(AppGlassTypography.subheadline)
-            .foregroundStyle(AppGlassColors.textSecondary)
-            .tracking(1.2)
-    }
-}
-
-struct AppGlassHeroCard<Trailing: View>: View {
-    let title: String
-    let subtitle: String
-    @ViewBuilder let trailing: Trailing
-
-    var body: some View {
-        GlassCard {
-            HStack(alignment: .center, spacing: AppGlassSpacing.md) {
-                VStack(alignment: .leading, spacing: AppGlassSpacing.xs) {
-                    Text(title)
-                        .font(AppGlassTypography.headline)
-                        .foregroundStyle(AppGlassColors.textPrimary)
-                    Text(subtitle)
-                        .font(AppGlassTypography.footnote)
-                        .foregroundStyle(AppGlassColors.textSecondary)
-                }
-
-                Spacer()
-                trailing
-            }
-        }
-    }
-}
