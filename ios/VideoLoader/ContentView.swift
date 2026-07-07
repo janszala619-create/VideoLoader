@@ -40,6 +40,10 @@ struct ContentView: View {
         videoLink.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    private var isIdle: Bool {
+        cleanedLink.isEmpty && errorMessage == nil && !isLoadingInfo && justQueuedTitle == nil
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -71,6 +75,12 @@ struct ContentView: View {
                         previewSection(info)
                         qualitySection(info)
                         downloadButton
+                    } else if isIdle {
+                        EmptyStateView(
+                            systemImage: "link.badge.plus",
+                            title: "Bereit für deinen ersten Download",
+                            message: "Füge oben einen Video-Link ein und tippe auf „Prüfen“, um Vorschau und Qualitäten zu laden."
+                        )
                     }
                 }
             }
@@ -265,21 +275,51 @@ struct ContentView: View {
     // MARK: - Zur Warteschlange hinzugefügt
 
     private func queuedBanner(for title: String) -> some View {
-        AppCard {
-            HStack(alignment: .top, spacing: AppSpacing.md) {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.title3)
-                    .foregroundStyle(AppTheme.success)
+        Group {
+            if let job = queue.jobs.last(where: { $0.title == title }) {
+                DownloadProgressCard(
+                    title: job.title,
+                    description: "Wird im Tab „Downloads“ verarbeitet",
+                    progress: job.status == .running ? job.progress : nil,
+                    statusText: queuedStatusText(for: job),
+                    statusTone: queuedStatusTone(for: job)
+                )
+            } else {
+                AppCard {
+                    HStack(alignment: .top, spacing: AppSpacing.md) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.title3)
+                            .foregroundStyle(AppTheme.success)
 
-                VStack(alignment: .leading, spacing: AppSpacing.xs) {
-                    Text("Zur Warteschlange hinzugefügt")
-                        .font(AppTypography.sectionTitle)
-                        .foregroundStyle(AppTheme.primaryText)
-                    Text("„\(title)“ wird jetzt im Tab „Downloads“ verarbeitet.")
-                        .font(AppTypography.footnote)
-                        .foregroundStyle(AppTheme.secondaryText)
+                        VStack(alignment: .leading, spacing: AppSpacing.xs) {
+                            Text("Zur Warteschlange hinzugefügt")
+                                .font(AppTypography.sectionTitle)
+                                .foregroundStyle(AppTheme.primaryText)
+                            Text("„\(title)“ wird jetzt im Tab „Downloads“ verarbeitet.")
+                                .font(AppTypography.footnote)
+                                .foregroundStyle(AppTheme.secondaryText)
+                        }
+                    }
                 }
             }
+        }
+    }
+
+    private func queuedStatusText(for job: DownloadJob) -> String {
+        switch job.status {
+        case .waiting: return "Wartet in der Warteschlange"
+        case .running: return "Wird heruntergeladen · \(Int(job.progress * 100))%"
+        case .done: return "Abgeschlossen"
+        case .failed: return "Fehlgeschlagen"
+        }
+    }
+
+    private func queuedStatusTone(for job: DownloadJob) -> Color {
+        switch job.status {
+        case .waiting: return AppTheme.secondaryText
+        case .running: return AppTheme.accent
+        case .done: return AppTheme.success
+        case .failed: return AppTheme.danger
         }
     }
 
@@ -312,7 +352,7 @@ struct ContentView: View {
                             Image(systemName: "play.circle.fill")
                                 .font(.system(size: 56))
                                 .foregroundStyle(.white)
-                                .shadow(color: AppColorsPremium.accentGlow, radius: 18, x: 0, y: 6)
+                                .appShadow(AppShadow(color: AppColorsPremium.accentGlow, radius: 18, x: 0, y: 6))
                         }
                         .accessibilityLabel("Videovorschau abspielen")
                     }
@@ -340,12 +380,19 @@ struct ContentView: View {
 
     private func qualitySection(_ info: VideoInfo) -> some View {
         VStack(alignment: .leading, spacing: AppSpacing.md) {
-            AppSectionHeader(title: "Qualität")
+            AppSectionHeader(
+                title: "Qualität",
+                subtitle: selectedQuality.map { "Ausgewählt: \($0.label)" }
+            )
 
             if info.qualities.isEmpty {
-                Text("Beste verfügbare Qualität wird verwendet.")
-                    .font(AppTypography.footnote)
-                    .foregroundStyle(AppTheme.secondaryText)
+                AppCard {
+                    EmptyStateView(
+                        systemImage: "checkmark.seal",
+                        title: "Automatische Qualität",
+                        message: "Für dieses Video bietet der Server nur eine Version an. Wir laden automatisch die beste verfügbare Qualität herunter."
+                    )
+                }
             } else {
                 AppCard {
                     VStack(spacing: AppSpacing.sm) {
