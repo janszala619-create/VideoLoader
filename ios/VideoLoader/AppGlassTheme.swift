@@ -59,6 +59,8 @@ enum AppGlassShadows {
 
 // MARK: - Stub Button Styles (für ContentView.swift Kompatibilität)
 struct GlassPrimaryButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.body.weight(.semibold))
@@ -68,11 +70,13 @@ struct GlassPrimaryButtonStyle: ButtonStyle {
                 RoundedRectangle(cornerRadius: AppGlassTheme.radiusMedium)
                     .fill(AppGlassColors.accentPrimary)
             )
-            .opacity(configuration.isPressed ? 0.88 : 1)
+            .opacity(isEnabled ? (configuration.isPressed ? 0.88 : 1) : 0.45)
     }
 }
 
 struct GlassSecondaryButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.body.weight(.semibold))
@@ -87,7 +91,7 @@ struct GlassSecondaryButtonStyle: ButtonStyle {
                 RoundedRectangle(cornerRadius: AppGlassTheme.radiusMedium)
                     .stroke(AppGlassColors.glassBorder, lineWidth: 1)
             )
-            .opacity(configuration.isPressed ? 0.85 : 1)
+            .opacity(isEnabled ? (configuration.isPressed ? 0.85 : 1) : 0.45)
     }
 }
 

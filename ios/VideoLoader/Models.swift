@@ -31,6 +31,23 @@ struct QualityOption: Identifiable, Hashable {
     let label: String
     let height: Int?
     let formatId: String?
+    var container: String?
+    var estimatedSize: Int?
+    var isAudioOnly: Bool = false
+
+    var detailText: String {
+        var parts: [String] = []
+        if let container, !container.isEmpty {
+            parts.append(container.uppercased())
+        }
+        parts.append(isAudioOnly ? "Nur Audio" : "Video + Audio")
+        if let estimatedSize, estimatedSize > 0 {
+            parts.append(ByteCountFormatter.string(fromByteCount: Int64(estimatedSize), countStyle: .file))
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    var isAutomatic: Bool { id == "auto" || formatId == "auto" }
 }
 
 /// Ein in der App gespeichertes, heruntergeladenes Video.
@@ -45,6 +62,33 @@ struct DownloadedVideo: Identifiable, Hashable {
     var sizeText: String {
         ByteCountFormatter.string(fromByteCount: size, countStyle: .file)
     }
+
+    var germanDateText: String {
+        let calendar = Calendar.autoupdatingCurrent
+        let time = Self.timeFormatter.string(from: date)
+        if calendar.isDateInToday(date) {
+            return "Heute, \(time)"
+        }
+        if calendar.isDateInYesterday(date) {
+            return "Gestern, \(time)"
+        }
+        return "\(Self.dateFormatter.string(from: date)) um \(time)"
+    }
+
+    private static let timeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "de_DE")
+        formatter.dateFormat = "HH:mm"
+        return formatter
+    }()
+
+    private static let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "de_DE")
+        formatter.dateStyle = .long
+        formatter.timeStyle = .none
+        return formatter
+    }()
 }
 
 /// Verwaltet den Ordner, in dem heruntergeladene Videos in der App liegen.

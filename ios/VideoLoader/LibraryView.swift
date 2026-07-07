@@ -18,6 +18,7 @@ enum LibrarySort: String, CaseIterable, Identifiable {
 
 /// Bibliothek: zeigt alle in der App gespeicherten Videos.
 struct LibraryView: View {
+    @Environment(\.openURL) private var openURL
     @State private var videos: [DownloadedVideo] = []
     @State private var selectedVideo: DownloadedVideo?
     @State private var feedback: String?
@@ -26,6 +27,7 @@ struct LibraryView: View {
     @State private var renameTarget: DownloadedVideo?
     @State private var renameText = ""
     @State private var showDeleteAll = false
+    @State private var showPhotosPermissionAlert = false
     @ObservedObject private var queue = DownloadQueue.shared
 
     /// Zahl der fertigen Downloads – ändert sie sich, wurde ein neues Video abgelegt.
@@ -72,7 +74,7 @@ struct LibraryView: View {
                                 Label("Alle löschen", systemImage: "trash")
                             }
                         } label: {
-                            Image(systemName: "ellipsis.circle")
+                            Label("Sortieren", systemImage: "arrow.up.arrow.down.circle")
                                 .foregroundStyle(AppGlassColors.textPrimary)
                         }
                     }
@@ -117,6 +119,16 @@ struct LibraryView: View {
             } message: {
                 Text(feedback ?? "")
             }
+            .alert("Zugriff auf Fotos fehlt", isPresented: $showPhotosPermissionAlert) {
+                Button("Abbrechen", role: .cancel) {}
+                Button("Einstellungen öffnen") {
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                        openURL(url)
+                    }
+                }
+            } message: {
+                Text("Erlaube VideoLoader in den iPhone-Einstellungen, Videos zur Fotos-App hinzuzufügen.")
+            }
         }
     }
 
@@ -126,14 +138,14 @@ struct LibraryView: View {
     private var mainContent: some View {
         if videos.isEmpty {
             GlassEmptyStateView(
-                title: "Noch keine Videos",
-                message: "Lade im Tab „Laden“ ein Video herunter. Es erscheint dann hier und kann abgespielt, geteilt oder in Fotos gesichert werden.",
+                title: "Noch keine Videos gespeichert",
+                message: "Geladene Videos erscheinen hier und können abgespielt, geteilt oder in Fotos gespeichert werden.",
                 systemImage: "film.stack"
             )
         } else if filteredVideos.isEmpty {
             GlassEmptyStateView(
-                title: "Keine Treffer",
-                message: emptySearchMessage,
+                title: "Keine Videos gefunden",
+                message: "Versuche einen anderen Suchbegriff oder ändere die Sortierung.",
                 systemImage: "magnifyingglass"
             )
             .searchable(text: $searchText, prompt: "Videos durchsuchen")
@@ -143,9 +155,6 @@ struct LibraryView: View {
         }
     }
 
-    private var emptySearchMessage: String {
-        "Für „\(searchText)“ wurde kein gespeichertes Video gefunden."
-    }
     private var libraryContent: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: AppGlassTheme.sectionSpacing) {
@@ -159,15 +168,16 @@ struct LibraryView: View {
             }
             .padding(.horizontal, AppGlassTheme.screenPadding)
             .padding(.top, AppGlassSpacing.md)
+            .padding(.bottom, 110)
         }
     }
 
     private var overviewCard: some View {
         AppGlassHeroCard(
             title: "Mediathek",
-            subtitle: "\(videos.count) Video\(videos.count == 1 ? "" : "s") gespeichert"
+            subtitle: "\(videos.count) Video\(videos.count == 1 ? "" : "s") · \(totalSizeText) belegt"
         ) {
-                Text(totalSizeText)
+                Text(sort.label)
                     .font(AppGlassTypography.subheadline)
                     .foregroundStyle(AppGlassColors.textPrimary)
                     .padding(.horizontal, AppGlassSpacing.md)
@@ -193,40 +203,54 @@ struct LibraryView: View {
                         .font(AppGlassTypography.headline)
                         .foregroundStyle(AppGlassColors.textPrimary)
                         .lineLimit(2)
-                    Text("\(video.sizeText) · \(video.date.formatted(date: .abbreviated, time: .shortened))")
+                    Text("\(video.sizeText) · \(video.germanDateText)")
                         .font(AppGlassTypography.footnote)
                         .foregroundStyle(AppGlassColors.textSecondary)
                 }
 
                 Spacer(minLength: 0)
-            }
 
-            HStack(spacing: AppGlassSpacing.md) {
-                Button {
-                    selectedVideo = video
+                Menu {
+                    Button {
+                        selectedVideo = video
+                    } label: {
+                        Label("Abspielen", systemImage: "play.fill")
+                    }
+                    ShareLink(item: video.url) {
+                        Label("Teilen", systemImage: "square.and.arrow.up")
+                    }
+                    Button {
+                        saveToPhotos(video)
+                    } label: {
+                        Label("In Fotos sichern", systemImage: "photo.badge.plus")
+                    }
+                    Button {
+                        startRename(video)
+                    } label: {
+                        Label("Umbenennen", systemImage: "pencil")
+                    }
+                    Button(role: .destructive) {
+                        remove(video)
+                    } label: {
+                        Label("Löschen", systemImage: "trash")
+                    }
                 } label: {
-                    Label("Abspielen", systemImage: "play.fill")
+                    Image(systemName: "ellipsis.circle")
+                        .font(.title3)
+                        .foregroundStyle(AppGlassColors.textSecondary)
+                        .frame(width: AppGlassTheme.controlHeight, height: AppGlassTheme.controlHeight)
                 }
-                .buttonStyle(GlassPrimaryButtonStyle())
-
-                ShareLink(item: video.url) {
-                    Label("Teilen", systemImage: "square.and.arrow.up")
-                }
-                .buttonStyle(GlassSecondaryButtonStyle())
+                .accessibilityLabel("Aktionen für \(video.name)")
             }
-
-            Button {
-                saveToPhotos(video)
-            } label: {
-                Label("In Fotos sichern", systemImage: "photo.badge.plus")
-            }
-            .buttonStyle(.borderless)
-            .font(AppGlassTypography.footnote.weight(.semibold))
-            .foregroundStyle(AppGlassColors.accentSecondary)
         }
         .contentShape(Rectangle())
         .onTapGesture { selectedVideo = video }
         .contextMenu {
+            Button {
+                selectedVideo = video
+            } label: {
+                Label("Abspielen", systemImage: "play.fill")
+            }
             Button {
                 startRename(video)
             } label: {
@@ -287,7 +311,11 @@ struct LibraryView: View {
 
     private func saveToPhotos(_ video: DownloadedVideo) {
         DownloadManager.saveToPhotos(fileURL: video.url) { errorMessage in
-            feedback = errorMessage ?? "„\(video.name)“ wurde in die Fotos-Galerie gesichert."
+            if let errorMessage, errorMessage.localizedCaseInsensitiveContains("Kein Zugriff auf Fotos") {
+                showPhotosPermissionAlert = true
+            } else {
+                feedback = errorMessage ?? "„\(video.name)“ wurde in die Fotos-Galerie gesichert."
+            }
         }
     }
 }
@@ -314,6 +342,17 @@ struct VideoThumbnail: View {
         }
         .frame(width: 104, height: 60)
         .clipShape(RoundedRectangle(cornerRadius: AppGlassTheme.radiusMedium, style: .continuous))
+        .overlay {
+            Circle()
+                .fill(.black.opacity(0.48))
+                .frame(width: 28, height: 28)
+                .overlay {
+                    Image(systemName: "play.fill")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.white)
+                        .offset(x: 1)
+                }
+        }
         .overlay(
             RoundedRectangle(cornerRadius: AppGlassTheme.radiusMedium, style: .continuous)
                 .stroke(AppGlassColors.glassBorder, lineWidth: 1)
