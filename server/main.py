@@ -33,6 +33,31 @@ _NORMALIZATION_TARGET = {
 }
 
 
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    """Fängt jede sonst ungefangene Exception ab, damit der Client statt eines
+    generischen "Internal Server Error" den echten Exception-Typ und die
+    Nachricht sieht, und damit sie mit vollem Traceback geloggt wird."""
+    logger.error(
+        "unhandled_exception path=%s exception_type=%s message=%s traceback=%s",
+        request.url.path,
+        type(exc).__name__,
+        _sanitize_log_text(str(exc)),
+        _sanitize_log_text(traceback.format_exc()),
+    )
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": {
+                "code": "UNHANDLED",
+                "message": "Unerwarteter Serverfehler.",
+                "exception_type": type(exc).__name__,
+                "detail": _sanitize_log_text(str(exc)),
+            }
+        },
+    )
+
+
 @app.get("/")
 def root():
     return {"status": "ok", "hinweis": "VideoLoader-Server läuft. Diese Adresse in der App eintragen."}
@@ -224,6 +249,12 @@ def _base_ydl_options(url: str) -> dict:
         "http_headers": _http_headers(url),
         "extractor_args": {"youtube": {"player_client": ["ios", "android", "web"]}},
         "logger": YtdlpLogger(),
+        # Erlaubt yt-dlp, den JS-Challenge-Solver (aus dem offiziellen yt-dlp/ejs-Repo)
+        # herunterzuladen, der zum Entschlüsseln von YouTube-Signaturen für höhere
+        # Qualitäten nötig ist. Ohne PO-Token-Provider (siehe requirements.txt) bleiben
+        # manche Formate trotzdem von YouTube blockiert (SABR-Restriktion) – siehe
+        # https://github.com/yt-dlp/yt-dlp/issues/12482.
+        "remote_components": {"ejs:github"},
     }
 
 
@@ -259,41 +290,137 @@ def api_info(
             detail=f"Dieser Link wird nicht unterstützt oder das Video ist nicht erreichbar. ({exc})",
         )
 
-    formats = info.get("formats") or []
-    allowed_heights = {2160, 1440, 1080, 720, 480, 360, 240, 144}
-    heights = sorted(
-        {
-            f["height"]
+    try:
+        formats = info.get("formats") or []
+        allowed_heights = {2160, 1440, 1080, 720, 480, 360, 240, 144}
+        heights = sorted(
+            {
+                f["height"]
+                for f in formats
+                if f.get("height") in allowed_heights
+                and f.get("vcodec") not in (None, "none")
+            },
+            reverse=True,
+        )
+        has_audio_only = any(
+            f.get("acodec") not in (None, "none") and f.get("vcodec") in (None, "none")
             for f in formats
-            if f.get("height") in allowed_heights
-            and f.get("vcodec") not in (None, "none")
-        },
-        reverse=True,
+        )
+
+        logger.info(
+            "VideoLoader /api/info formats_total=%s heights_detected=%s has_audio_only=%s",
+            len(formats),
+            heights,
+            has_audio_only,
+        )
+        if len(heights) <= 1:
+            logger.warning(
+                "VideoLoader /api/info only_low_quality_available heights=%s reason="
+                "YouTube liefert hoehere Aufloesungen fuer dieses Video/diese Session aktuell "
+                "nicht aus (haeufigste Ursache: SABR-Streaming-Restriktion bzw. fehlender/"
+                "unwirksamer PO-Token, siehe https://github.com/yt-dlp/yt-dlp/issues/12482). "
+                "Dies ist keine Server-Filterlogik, sondern eine YouTube-seitige Einschraenkung.",
+                heights,
+            )
+
+        qualities = _build_quality_options(heights, formats, has_audio_only)
+        logger.info(
+            "VideoLoader /api/info qualities_generated=%s",
+            [q["id"] for q in qualities],
+        )
+
+        # Für die Vorschau ein direkt abspielbares MP4 (Bild + Ton) bis 720p suchen
+        preview_url = None
+        preview_height = -1
+        for f in formats:
+            if (
+                f.get("vcodec") not in (None, "none")
+                and f.get("acodec") not in (None, "none")
+                and f.get("ext") == "mp4"
+                and str(f.get("url", "")).startswith("http")
+                and (f.get("height") or 0) <= 720
+                and (f.get("height") or 0) > preview_height
+            ):
+                preview_height = f.get("height") or 0
+                preview_url = f["url"]
+
+        return {
+            "title": info.get("title") or "Video",
+            "uploader": info.get("uploader") or info.get("channel"),
+            "duration": info.get("duration"),
+            "thumbnail": info.get("thumbnail"),
+            "preview_url": preview_url,
+            "heights": heights,
+            "qualities": qualities,
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(
+            "VideoLoader /api/info format_processing_failed url=%s exception_type=%s message=%s traceback=%s",
+            _safe_url(url),
+            type(exc).__name__,
+            _sanitize_log_text(str(exc)),
+            _sanitize_log_text(traceback.format_exc()),
+        )
+        raise HTTPException(
+            status_code=422,
+            detail=f"Die Formatdaten dieses Videos konnten nicht verarbeitet werden. ({type(exc).__name__}: {exc})",
+        )
+
+
+def _quality_has_combined_format(height: int, formats: list[dict]) -> bool:
+    """Prüft, ob für diese Höhe bereits ein gemuxtes Format (Video+Audio in einer
+    Datei) existiert, oder ob yt-dlp Video- und Audio-Spur separat laden und
+    zusammenführen muss (braucht ffmpeg, dauert etwas länger)."""
+    return any(
+        f.get("height") == height
+        and f.get("vcodec") not in (None, "none")
+        and f.get("acodec") not in (None, "none")
+        for f in formats
     )
 
-    # Für die Vorschau ein direkt abspielbares MP4 (Bild + Ton) bis 720p suchen
-    preview_url = None
-    preview_height = -1
-    for f in formats:
-        if (
-            f.get("vcodec") not in (None, "none")
-            and f.get("acodec") not in (None, "none")
-            and f.get("ext") == "mp4"
-            and str(f.get("url", "")).startswith("http")
-            and (f.get("height") or 0) <= 720
-            and (f.get("height") or 0) > preview_height
-        ):
-            preview_height = f.get("height") or 0
-            preview_url = f["url"]
 
-    return {
-        "title": info.get("title") or "Video",
-        "uploader": info.get("uploader") or info.get("channel"),
-        "duration": info.get("duration"),
-        "thumbnail": info.get("thumbnail"),
-        "preview_url": preview_url,
-        "heights": heights,
-    }
+def _build_quality_options(heights: list[int], formats: list[dict], has_audio_only: bool) -> list[dict]:
+    """Erzeugt eine stabile, für die App direkt anzeigbare Liste an Qualitätsoptionen.
+    Nur Höhen, die yt-dlp für dieses Video tatsächlich geliefert hat, werden angeboten."""
+    qualities: list[dict] = [
+        {
+            "id": "auto",
+            "label": "Automatisch",
+            "subtitle": "Beste verfügbare Qualität (Video + Audio)",
+            "height": None,
+            "ext": "mp4",
+            "kind": "auto",
+            "format_selector": _format_selector(None),
+            "is_recommended": False,
+        }
+    ]
+    for i, height in enumerate(heights):
+        combined = _quality_has_combined_format(height, formats)
+        qualities.append({
+            "id": f"h{height}",
+            "label": f"{height}p",
+            "subtitle": "MP4 · Video + Audio" if combined else "MP4 · Video + Audio (wird zusammengeführt)",
+            "height": height,
+            "ext": "mp4",
+            "kind": "video",
+            "format_selector": _format_selector(height),
+            # Die höchste tatsächlich verfügbare Auflösung ist die Empfehlung.
+            "is_recommended": i == 0,
+        })
+    if has_audio_only:
+        qualities.append({
+            "id": "audio",
+            "label": "Nur Audio",
+            "subtitle": "M4A · Audio ohne Video",
+            "height": None,
+            "ext": "m4a",
+            "kind": "audio",
+            "format_selector": "bestaudio[acodec^=mp4a]/bestaudio/best",
+            "is_recommended": False,
+        })
+    return qualities
 
 
 def _format_selector(quality: int | None) -> str:
@@ -553,6 +680,7 @@ def api_download(
     height: int | None = None,
     quality: int | None = None,
     format_id: str | None = None,
+    format_selector: str | None = None,
     request: Request = None,
 ):
     request_id = uuid.uuid4().hex[:12]
@@ -598,10 +726,23 @@ def api_download(
         )
 
     requested_quality = quality if quality is not None else height
-    format_selector = (
-        format_id.strip()
-        if isinstance(format_id, str) and format_id.strip()
-        else _format_selector(requested_quality)
+    # Priorität: expliziter format_selector von der App (aus /api/info qualities[].format_selector)
+    # > alter format_id-Parameter (Cloud-Server-Legacy) > aus height/quality berechneter Selector.
+    if isinstance(format_selector, str) and format_selector.strip():
+        resolved_selector = format_selector.strip()
+    elif isinstance(format_id, str) and format_id.strip():
+        resolved_selector = format_id.strip()
+    else:
+        resolved_selector = _format_selector(requested_quality)
+    logger.info(
+        "VideoLoader /api/download requested_quality_input request_id=%s format_selector_param=%s "
+        "format_id_param=%s quality_param=%s height_param=%s resolved_selector=%s",
+        request_id,
+        format_selector,
+        format_id,
+        quality,
+        height,
+        resolved_selector,
     )
     tmpdir = tempfile.mkdtemp(prefix="videoloader_")
     try:
@@ -612,7 +753,7 @@ def api_download(
             quality,
             height,
             format_id,
-            format_selector,
+            resolved_selector,
             YT_DLP_VERSION,
         )
         logger.info(
@@ -624,11 +765,11 @@ def api_download(
             request_id,
             _safe_url(url),
             requested_quality,
-            format_selector,
+            resolved_selector,
             os.path.join(tmpdir, "video.%(ext)s"),
             YT_DLP_VERSION,
         )
-        opts = _download_options(url, tmpdir, format_selector)
+        opts = _download_options(url, tmpdir, resolved_selector)
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=True)
     except Exception as exc:
@@ -641,7 +782,7 @@ def api_download(
             request_id,
             _safe_url(url),
             requested_quality,
-            format_selector,
+            resolved_selector,
             YT_DLP_VERSION,
             getattr(exc, "ie", None) or "unknown",
             exc_type,
@@ -670,7 +811,7 @@ def api_download(
             request_id,
             _safe_url(url),
             requested_quality,
-            format_selector,
+            resolved_selector,
             YT_DLP_VERSION,
         )
         return _download_error_response(
@@ -699,7 +840,7 @@ def api_download(
             request_id,
             _safe_url(url),
             requested_quality,
-            format_selector,
+            resolved_selector,
             YT_DLP_VERSION,
             normalize_error or "final_file_failed_ffprobe_validation",
         )
