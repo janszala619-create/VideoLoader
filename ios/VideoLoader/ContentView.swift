@@ -25,6 +25,7 @@ struct ContentView: View {
     @State private var showPreviewPlayer = false
     @State private var justQueuedTitle: String?
     @State private var serverOnline: Bool?
+    @State private var serverCheckToken = UUID()
 
     @ObservedObject private var queue = DownloadQueue.shared
 
@@ -476,13 +477,20 @@ struct ContentView: View {
     }
 
     private func checkServer() async {
+        let token = UUID()
+        serverCheckToken = token
         serverOnline = nil
         guard !activeBaseURL.trimmingCharacters(in: .whitespaces).isEmpty else {
-            serverOnline = false
+            if serverCheckToken == token { serverOnline = false }
             return
         }
         let api = ServerAPI(kind: activeServer, baseURL: activeBaseURL)
-        serverOnline = await api.isReachable()
+        let reachable = await api.isReachable()
+        // Ein inzwischen gestarteter, neuerer Check hat Vorrang – dieses (ältere)
+        // Ergebnis würde sonst den aktuelleren Status wieder überschreiben (Flackern).
+        if serverCheckToken == token {
+            serverOnline = reachable
+        }
     }
 
     private func loadInfo() async {

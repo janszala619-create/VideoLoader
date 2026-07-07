@@ -58,10 +58,10 @@ struct ServerAPI {
     // MARK: - Infos holen
 
     func fetchInfo(for videoURL: String) async throws -> VideoInfo {
-        try validateVideoURL(videoURL)
+        let normalized = try validateVideoURL(videoURL)
         switch kind {
-        case .videoLoader: return try await fetchInfoVideoLoader(videoURL)
-        case .vidSave: return try await fetchInfoVidSave(videoURL)
+        case .videoLoader: return try await fetchInfoVideoLoader(normalized)
+        case .vidSave: return try await fetchInfoVidSave(normalized)
         }
     }
 
@@ -125,10 +125,10 @@ struct ServerAPI {
     // MARK: - Download-Adresse
 
     func downloadURL(for videoURL: String, quality: QualityOption?) throws -> URL {
-        try validateVideoURL(videoURL)
+        let normalized = try validateVideoURL(videoURL)
         switch kind {
         case .videoLoader:
-            var query = [URLQueryItem(name: "url", value: videoURL)]
+            var query = [URLQueryItem(name: "url", value: normalized)]
             if let height = quality?.height {
                 query.append(URLQueryItem(name: "quality", value: String(height)))
             }
@@ -142,7 +142,7 @@ struct ServerAPI {
             return endpoint
         case .vidSave:
             let endpoint = try url(path: "/api/download", query: [
-                URLQueryItem(name: "url", value: videoURL),
+                URLQueryItem(name: "url", value: normalized),
                 URLQueryItem(name: "format_id", value: Self.vidSaveDownloadSelector(for: quality)),
             ])
             debugRequest(
@@ -180,11 +180,19 @@ struct ServerAPI {
 
     // MARK: - Hilfen
 
-    private func validateVideoURL(_ videoURL: String) throws {
-        let trimmed = videoURL.trimmingCharacters(in: .whitespacesAndNewlines)
+    /// Prüft den eingegebenen Video-Link und liefert ihn normalisiert zurück
+    /// (getrimmt, mit ergänztem `https://`, falls kein Schema angegeben wurde —
+    /// analog zu `normalizedBase()` für die Server-Adresse). Ohne diese Ergänzung
+    /// würde z. B. "youtube.com/watch?v=…" (ohne "https://") von `URLComponents`
+    /// als schemaloser Pfad ohne Host geparst und fälschlich als ungültig gelten.
+    private func validateVideoURL(_ videoURL: String) throws -> String {
+        var trimmed = videoURL.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { throw APIError.badURL }
         if Self.containsServerAPIPath(trimmed) {
             throw APIError.server(Self.videoURLInServerFieldMessage)
+        }
+        if !trimmed.lowercased().hasPrefix("http") {
+            trimmed = "https://" + trimmed
         }
 
         guard let videoComponents = URLComponents(string: trimmed),
@@ -196,6 +204,7 @@ struct ServerAPI {
             throw APIError.server(Self.videoURLInServerFieldMessage)
         }
         guard Self.looksLikeVideoURL(trimmed) else { throw APIError.badURL }
+        return trimmed
     }
 
     private static func containsServerAPIPath(_ text: String) -> Bool {
