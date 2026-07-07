@@ -18,6 +18,7 @@ enum LibrarySort: String, CaseIterable, Identifiable {
 
 /// Bibliothek: zeigt alle in der App gespeicherten Videos.
 struct LibraryView: View {
+    @Environment(\.openURL) private var openURL
     @State private var videos: [DownloadedVideo] = []
     @State private var selectedVideo: DownloadedVideo?
     @State private var feedback: String?
@@ -26,6 +27,7 @@ struct LibraryView: View {
     @State private var renameTarget: DownloadedVideo?
     @State private var renameText = ""
     @State private var showDeleteAll = false
+    @State private var showPhotosPermissionAlert = false
     @ObservedObject private var queue = DownloadQueue.shared
 
     /// Zahl der fertigen Downloads – ändert sie sich, wurde ein neues Video abgelegt.
@@ -116,6 +118,16 @@ struct LibraryView: View {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text(feedback ?? "")
+            }
+            .alert("Zugriff auf Fotos fehlt", isPresented: $showPhotosPermissionAlert) {
+                Button("Abbrechen", role: .cancel) {}
+                Button("Einstellungen öffnen") {
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                        openURL(url)
+                    }
+                }
+            } message: {
+                Text("Erlaube VideoLoader in den iPhone-Einstellungen, Videos zur Fotos-App hinzuzufügen.")
             }
         }
     }
@@ -299,7 +311,11 @@ struct LibraryView: View {
 
     private func saveToPhotos(_ video: DownloadedVideo) {
         DownloadManager.saveToPhotos(fileURL: video.url) { errorMessage in
-            feedback = errorMessage ?? "„\(video.name)“ wurde in die Fotos-Galerie gesichert."
+            if let errorMessage, errorMessage.localizedCaseInsensitiveContains("Kein Zugriff auf Fotos") {
+                showPhotosPermissionAlert = true
+            } else {
+                feedback = errorMessage ?? "„\(video.name)“ wurde in die Fotos-Galerie gesichert."
+            }
         }
     }
 }
