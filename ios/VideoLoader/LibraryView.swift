@@ -239,9 +239,6 @@ struct LibraryView: View {
             } label: {
                 Label("Abspielen", systemImage: "play.fill")
             }
-            ShareLink(item: video.url) {
-                Label("Teilen", systemImage: "square.and.arrow.up")
-            }
             Button {
                 startRename(video)
             } label: {
