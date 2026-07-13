@@ -49,8 +49,8 @@ struct ContentView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: AppSpacing.xl) {
-                    serverRow
                     linkInputSection
+                    serverRow
 
                     if let errorMessage {
                         ErrorStateView(
@@ -161,16 +161,17 @@ struct ContentView: View {
         }
     }
 
-    // MARK: - Server Row (kompakt, kein eigener Abschnitt)
+    // MARK: - Server Row (kompakt, zurückhaltend – kein eigener Abschnitt)
 
     private var serverRow: some View {
-        HStack(spacing: AppSpacing.md) {
+        HStack(spacing: AppSpacing.sm) {
             Picker("", selection: $activeServerRaw) {
                 ForEach(ServerKind.allCases) { kind in
                     Text(kind.label).tag(kind.rawValue)
                 }
             }
             .pickerStyle(.segmented)
+            .controlSize(.small)
             .onChange(of: activeServerRaw) { _, _ in
                 info = nil
                 errorMessage = nil
@@ -211,10 +212,10 @@ struct ContentView: View {
         .accessibilityLabel("Serverstatus prüfen")
     }
 
-    // MARK: - Link-Eingabe (kein AppCard-Wrapper)
+    // MARK: - Link-Eingabe (Hero-Card – wichtigster Call-to-Action)
 
     private var linkInputSection: some View {
-        VStack(alignment: .leading, spacing: AppSpacing.md) {
+        AppCard {
             AppSectionHeader(title: "Video-Link")
 
             HStack(spacing: AppSpacing.sm) {
