@@ -38,7 +38,7 @@ struct AppTextField: View {
             .frame(minHeight: AppSpacing.controlHeight)
             .background(
                 RoundedRectangle(cornerRadius: AppRadius.md, style: .continuous)
-                    .fill(AppColorsPremium.glassSurfaceStrong)
+                    .fill(isFocused ? AppTheme.accent.opacity(0.06) : AppColorsPremium.glassSurfaceStrong)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: AppRadius.md, style: .continuous)

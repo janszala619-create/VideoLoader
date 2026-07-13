@@ -9,6 +9,21 @@ struct LoadingStateView: View {
         VStack(spacing: AppSpacing.lg) {
             ProgressView()
                 .tint(AppTheme.accent)
+                .frame(width: 88, height: 88)
+                .background(
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [AppTheme.accent.opacity(0.16), AppTheme.accent.opacity(0.04)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                )
+                .overlay(
+                    Circle()
+                        .stroke(AppColorsPremium.glassBorder, lineWidth: 1)
+                )
 
             VStack(spacing: AppSpacing.sm) {
                 Text(title)

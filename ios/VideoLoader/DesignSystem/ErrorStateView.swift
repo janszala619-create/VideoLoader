@@ -14,6 +14,10 @@ struct ErrorStateView: View {
                 Image(systemName: systemImage)
                     .font(.title3)
                     .foregroundStyle(AppTheme.danger)
+                    .frame(width: 36, height: 36)
+                    .background(
+                        Circle().fill(AppTheme.danger.opacity(0.12))
+                    )
 
                 VStack(alignment: .leading, spacing: AppSpacing.xs) {
                     Text(title)

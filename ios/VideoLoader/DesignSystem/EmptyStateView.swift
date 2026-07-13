@@ -24,6 +24,10 @@ struct EmptyStateView: View {
                             )
                         )
                 )
+                .overlay(
+                    Circle()
+                        .stroke(AppColorsPremium.glassBorder, lineWidth: 1)
+                )
 
             VStack(spacing: AppSpacing.sm) {
                 Text(title)

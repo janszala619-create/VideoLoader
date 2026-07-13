@@ -59,7 +59,7 @@ struct SettingsView: View {
             if let activeServer = ServerKind(rawValue: activeServerRaw) {
                 HStack(alignment: .top, spacing: AppSpacing.sm) {
                     AppStatusDot(color: AppTheme.accent)
-                        .padding(.top, 5)
+                        .padding(.top, AppSpacing.xs)
                     VStack(alignment: .leading, spacing: AppSpacing.xs) {
                         Text(activeServer.label)
                             .font(AppTypography.bodyEmphasized)
