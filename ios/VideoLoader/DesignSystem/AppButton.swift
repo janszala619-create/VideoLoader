@@ -40,6 +40,26 @@ enum AppButtonKind {
     }
 }
 
+extension View {
+    /// Gemeinsame visuelle Hülle für button-artige Controls (z. B. `AppButton`, `ShareLink`),
+    /// damit alle Aktionsflächen im selben Stil erscheinen statt einzeln nachgebaut zu werden.
+    func appButtonChrome(_ kind: AppButtonKind) -> some View {
+        self
+            .frame(maxWidth: .infinity, minHeight: AppSpacing.controlHeight)
+            .foregroundStyle(kind.foreground)
+            .background(
+                RoundedRectangle(cornerRadius: AppRadius.md, style: .continuous)
+                    .fill(kind.background)
+            )
+            .overlay {
+                if let borderColor = kind.borderColor {
+                    RoundedRectangle(cornerRadius: AppRadius.md, style: .continuous)
+                        .stroke(borderColor, lineWidth: 1)
+                }
+            }
+    }
+}
+
 /// Einheitlicher Button mit Primary-, Secondary- und Destructive-Stil
 /// sowie eingebautem Loading- und Disabled-State.
 struct AppButton: View {
@@ -65,18 +85,7 @@ struct AppButton: View {
                 Text(title)
                     .font(AppTypography.bodyEmphasized)
             }
-            .frame(maxWidth: .infinity, minHeight: AppSpacing.controlHeight)
-            .foregroundStyle(kind.foreground)
-            .background(
-                RoundedRectangle(cornerRadius: AppRadius.md, style: .continuous)
-                    .fill(kind.background)
-            )
-            .overlay {
-                if let borderColor = kind.borderColor {
-                    RoundedRectangle(cornerRadius: AppRadius.md, style: .continuous)
-                        .stroke(borderColor, lineWidth: 1)
-                }
-            }
+            .appButtonChrome(kind)
             .opacity(isDisabled ? 0.5 : 1)
         }
         .buttonStyle(PressScaleButtonStyle())

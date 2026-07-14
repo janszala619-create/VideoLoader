@@ -14,7 +14,7 @@ struct ErrorStateView: View {
                 Image(systemName: systemImage)
                     .font(.title3)
                     .foregroundStyle(AppTheme.danger)
-                    .frame(width: 36, height: 36)
+                    .frame(width: AppIconSize.inlineBadge, height: AppIconSize.inlineBadge)
                     .background(
                         Circle().fill(AppTheme.danger.opacity(0.12))
                     )

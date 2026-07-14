@@ -9,7 +9,7 @@ struct LoadingStateView: View {
         VStack(spacing: AppSpacing.lg) {
             ProgressView()
                 .tint(AppTheme.accent)
-                .frame(width: 88, height: 88)
+                .frame(width: AppIconSize.stateBadge, height: AppIconSize.stateBadge)
                 .background(
                     Circle()
                         .fill(

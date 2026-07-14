@@ -2,6 +2,8 @@ import SwiftUI
 
 /// Einheitliche Abstands-Skala für Paddings, Stacks und Layout-Lücken.
 enum AppSpacing {
+    /// Feinabstimmung für sehr kompakte Elemente (z. B. Badge-Innenabstand).
+    static let xxs: CGFloat = 2
     static let xs: CGFloat = 4
     static let sm: CGFloat = 8
     static let md: CGFloat = 12

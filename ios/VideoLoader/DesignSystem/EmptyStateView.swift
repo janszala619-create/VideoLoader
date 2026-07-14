@@ -11,9 +11,9 @@ struct EmptyStateView: View {
     var body: some View {
         VStack(spacing: AppSpacing.lg) {
             Image(systemName: systemImage)
-                .font(.system(size: 36))
+                .font(.system(size: AppIconSize.stateGlyph))
                 .foregroundStyle(AppTheme.accent)
-                .frame(width: 88, height: 88)
+                .frame(width: AppIconSize.stateBadge, height: AppIconSize.stateBadge)
                 .background(
                     Circle()
                         .fill(

@@ -362,7 +362,7 @@ struct ContentView: View {
                             showPreviewPlayer = true
                         } label: {
                             Image(systemName: "play.circle.fill")
-                                .font(.system(size: 56))
+                                .font(.system(size: AppIconSize.hero))
                                 .foregroundStyle(.white)
                                 .appShadow(AppShadow(color: AppColorsPremium.accentGlow, radius: 18, x: 0, y: 6))
                         }

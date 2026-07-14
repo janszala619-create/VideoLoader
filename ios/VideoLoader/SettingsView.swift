@@ -97,7 +97,6 @@ struct SettingsView: View {
                 .foregroundStyle(AppTheme.secondaryText)
         }
     }
-
 }
 
 #Preview {

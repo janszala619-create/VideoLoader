@@ -10,7 +10,7 @@ struct AppBadge: View {
             .font(.caption2.weight(.semibold))
             .foregroundStyle(tint)
             .padding(.horizontal, AppSpacing.sm)
-            .padding(.vertical, 2)
+            .padding(.vertical, AppSpacing.xxs)
             .background(
                 Capsule().fill(tint.opacity(0.16))
             )

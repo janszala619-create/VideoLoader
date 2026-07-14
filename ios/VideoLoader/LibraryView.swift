@@ -202,18 +202,9 @@ struct LibraryView: View {
                 ShareLink(item: video.url) {
                     Label("Teilen", systemImage: "square.and.arrow.up")
                         .font(AppTypography.bodyEmphasized)
-                        .frame(maxWidth: .infinity, minHeight: AppSpacing.controlHeight)
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(AppTheme.primaryText)
-                .background(
-                    RoundedRectangle(cornerRadius: AppRadius.md, style: .continuous)
-                        .fill(AppColorsPremium.glassSurfaceStrong)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: AppRadius.md, style: .continuous)
-                        .stroke(AppColorsPremium.glassBorder, lineWidth: 1)
-                )
+                .appButtonChrome(.secondary)
             }
 
             Button {
@@ -295,6 +286,9 @@ struct LibraryView: View {
 
 /// Erzeugt ein Vorschaubild aus der Videodatei.
 struct VideoThumbnail: View {
+    private static let width: CGFloat = 104
+    private static let height: CGFloat = 60
+
     let url: URL
     @State private var image: UIImage?
 
@@ -313,7 +307,7 @@ struct VideoThumbnail: View {
                     }
             }
         }
-        .frame(width: 104, height: 60)
+        .frame(width: Self.width, height: Self.height)
         .clipShape(RoundedRectangle(cornerRadius: AppRadius.md, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: AppRadius.md, style: .continuous)
