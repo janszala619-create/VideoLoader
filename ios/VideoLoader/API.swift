@@ -40,8 +40,16 @@ struct ServerAPI {
         if !trimmed.lowercased().hasPrefix("http") {
             trimmed = "http://" + trimmed
         }
-        guard let components = URLComponents(string: trimmed) else { throw APIError.badURL }
+        guard let components = URLComponents(string: trimmed) else {
+            #if DEBUG
+            print("[VideoLoader][validate] FAIL reason=server-address-not-parseable trimmed=\"\(trimmed)\"")
+            #endif
+            throw APIError.badURL
+        }
         if Self.containsServerAPIPath(components.path) || Self.looksLikeVideoURL(trimmed) {
+            #if DEBUG
+            print("[VideoLoader][validate] FAIL reason=server-address-looks-like-video-or-api-path trimmed=\"\(trimmed)\"")
+            #endif
             throw APIError.server(Self.videoURLInServerFieldMessage)
         }
         return components
@@ -51,7 +59,12 @@ struct ServerAPI {
         var components = try normalizedBase()
         components.path = path
         components.queryItems = query.isEmpty ? nil : query
-        guard let result = components.url else { throw APIError.badURL }
+        guard let result = components.url else {
+            #if DEBUG
+            print("[VideoLoader][validate] FAIL reason=request-url-build-failed path=\(path) query=\(query)")
+            #endif
+            throw APIError.badURL
+        }
         return result
     }
 
@@ -211,9 +224,20 @@ struct ServerAPI {
     /// würde z. B. "youtube.com/watch?v=…" (ohne "https://") von `URLComponents`
     /// als schemaloser Pfad ohne Host geparst und fälschlich als ungültig gelten.
     private func validateVideoURL(_ videoURL: String) throws -> String {
+        #if DEBUG
+        print("[VideoLoader][validate] input=\"\(videoURL)\"")
+        #endif
         var trimmed = videoURL.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { throw APIError.badURL }
+        guard !trimmed.isEmpty else {
+            #if DEBUG
+            print("[VideoLoader][validate] FAIL reason=empty-after-trim")
+            #endif
+            throw APIError.badURL
+        }
         if Self.containsServerAPIPath(trimmed) {
+            #if DEBUG
+            print("[VideoLoader][validate] FAIL reason=contains-server-api-path trimmed=\"\(trimmed)\"")
+            #endif
             throw APIError.server(Self.videoURLInServerFieldMessage)
         }
         if !trimmed.lowercased().hasPrefix("http") {
@@ -222,13 +246,27 @@ struct ServerAPI {
 
         guard let videoComponents = URLComponents(string: trimmed),
               let videoHost = videoComponents.host?.lowercased() else {
+            #if DEBUG
+            print("[VideoLoader][validate] FAIL reason=no-parseable-host trimmed=\"\(trimmed)\"")
+            #endif
             throw APIError.badURL
         }
         let baseComponents = try normalizedBase()
         if let baseHost = baseComponents.host?.lowercased(), videoHost == baseHost {
+            #if DEBUG
+            print("[VideoLoader][validate] FAIL reason=video-host-equals-server-host host=\(videoHost)")
+            #endif
             throw APIError.server(Self.videoURLInServerFieldMessage)
         }
-        guard Self.looksLikeVideoURL(trimmed) else { throw APIError.badURL }
+        guard Self.looksLikeVideoURL(trimmed) else {
+            #if DEBUG
+            print("[VideoLoader][validate] FAIL reason=host-not-recognized-as-video-url host=\(videoHost)")
+            #endif
+            throw APIError.badURL
+        }
+        #if DEBUG
+        print("[VideoLoader][validate] OK normalized=\"\(trimmed)\"")
+        #endif
         return trimmed
     }
 

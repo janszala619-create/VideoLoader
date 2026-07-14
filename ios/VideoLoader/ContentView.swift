@@ -507,6 +507,9 @@ struct ContentView: View {
             info = result
             selectedQuality = result.qualities.first
         } catch let error as APIError {
+            #if DEBUG
+            print("[VideoLoader][loadInfo] APIError=\(error) link=\"\(cleanedLink)\" server=\(activeServer.rawValue) baseURL=\"\(activeBaseURL)\"")
+            #endif
             errorMessage = error.errorDescription
         } catch {
             errorMessage = "Das Video konnte nicht geprüft werden: \(error.localizedDescription)"
