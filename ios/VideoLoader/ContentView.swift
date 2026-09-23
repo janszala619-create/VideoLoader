@@ -5,15 +5,13 @@ struct ContentView: View {
     @Binding var pendingLink: String?
     @Environment(\.scenePhase) private var scenePhase
 
-    private static let defaultLocalServerURL = "http://100.80.105.62:9876"
-    private static let invalidVideoInputMessage = "Bitte gib einen YouTube-Link ins Linkfeld ein. Die Server-Adresse gehört in die Einstellungen."
+    private static let defaultLocalServerURL = ""
+    private static let invalidVideoInputMessage = "Bitte gib einen Video-Link ins Linkfeld ein. Die Server-Adresse gehÃ¶rt in die Einstellungen."
 
-    @AppStorage("serverURL_videoLoader") private var macServerURL = "http://100.80.105.62:9876"
-    @AppStorage("serverURL_vidSave") private var cloudServerURL = "http://158.101.168.11:8765"
+    @AppStorage("serverURL_videoLoader") private var macServerURL = ""
+    @AppStorage("serverURL_vidSave") private var cloudServerURL = ""
     @AppStorage("activeServer") private var activeServerRaw = ServerKind.videoLoader.rawValue
-    @AppStorage("didMigrateToLocalServer8765") private var didMigrateToLocalServer = false
-    @AppStorage("didMigrateToWindowsLocalServer8765") private var didMigrateToWindowsLocalServer = false
-    @AppStorage("didMigrateToLocalServer9876") private var didMigrateToLocalServer9876 = false
+    @AppStorage("didRemoveBundledServers") private var didRemoveBundledServers = false
     @AppStorage("preferredQualityID") private var preferredQualityID = "auto"
 
     @State private var clipboardHasLink = false
@@ -58,23 +56,23 @@ struct ContentView: View {
                         GlassErrorStateView(
                             title: "Aktion fehlgeschlagen",
                             message: errorMessage,
-                            actionTitle: "Einstellungen öffnen",
+                            actionTitle: "Einstellungen Ã¶ffnen",
                             action: { showSettings = true }
                         )
                     }
 
                     if isLoadingInfo {
                         GlassLoadingStateView(
-                            title: "Video wird geprüft",
-                            message: "Metadaten und verfügbare Qualitäten werden geladen."
+                            title: "Video wird geprÃ¼ft",
+                            message: "Metadaten und verfÃ¼gbare QualitÃ¤ten werden geladen."
                         )
                     }
 
                     if let justQueuedTitle {
                         GlassStatusBanner(
                             tone: .success,
-                            title: "Zur Warteschlange hinzugefügt",
-                            message: "„\(justQueuedTitle)“ wird jetzt im Tab „Downloads“ verarbeitet."
+                            title: "Zur Warteschlange hinzugefÃ¼gt",
+                            message: "â€ž\(justQueuedTitle)â€œ wird jetzt im Tab â€žDownloadsâ€œ verarbeitet."
                         )
                     }
 
@@ -84,8 +82,8 @@ struct ContentView: View {
                         downloadButton
                     } else if !isLoadingInfo && errorMessage == nil {
                         GlassEmptyStateView(
-                            title: "Noch kein Video ausgewählt",
-                            message: "Füge einen Video-Link ein, prüfe das Video und wähle anschließend die gewünschte Qualität. YouTube und weitere Quellen sind je nach Server verfügbar.",
+                            title: "Noch kein Video ausgewÃ¤hlt",
+                            message: "FÃ¼ge einen Video-Link ein, prÃ¼fe das Video und wÃ¤hle anschlieÃŸend die gewÃ¼nschte QualitÃ¤t. YouTube und weitere Quellen sind je nach Server verfÃ¼gbar.",
                             systemImage: "play.rectangle.on.rectangle"
                         )
                     }
@@ -105,10 +103,10 @@ struct ContentView: View {
                         Image(systemName: "gearshape")
                             .foregroundStyle(AppGlassColors.textPrimary)
                     }
-                    .accessibilityLabel("Einstellungen öffnen")
+                    .accessibilityLabel("Einstellungen Ã¶ffnen")
                 }
             }
-            .sheet(isPresented: $showSettings) {
+            .sheet(isPresented: $showSettings, onDismiss: { Task { await checkServer() } }) {
                 SettingsView(
                     macServerURL: $macServerURL,
                     cloudServerURL: $cloudServerURL,
@@ -131,27 +129,9 @@ struct ContentView: View {
                 }
             }
             .onAppear {
-                if !didMigrateToLocalServer {
-                    if macServerURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        macServerURL = Self.defaultLocalServerURL
-                    }
-                    activeServerRaw = ServerKind.videoLoader.rawValue
-                    didMigrateToLocalServer = true
-                }
-                if !didMigrateToWindowsLocalServer {
-                    let currentLocalURL = macServerURL.trimmingCharacters(in: .whitespacesAndNewlines)
-                    if currentLocalURL == "http://192.168.1.23:8000" ||
-                        currentLocalURL == "http://100.80.105.62:8765" ||
-                        currentLocalURL == cloudServerURL.trimmingCharacters(in: .whitespacesAndNewlines) {
-                        macServerURL = Self.defaultLocalServerURL
-                    }
-                    activeServerRaw = ServerKind.videoLoader.rawValue
-                    didMigrateToWindowsLocalServer = true
-                }
-                if !didMigrateToLocalServer9876 {
-                    migrateLocalServerURLTo9876IfNeeded()
-                    activeServerRaw = ServerKind.videoLoader.rawValue
-                    didMigrateToLocalServer9876 = true
+                if !didRemoveBundledServers {
+                    removeBundledServerAddresses()
+                    didRemoveBundledServers = true
                 }
                 if activeBaseURL.isEmpty { showSettings = true }
                 logActiveServer()
@@ -234,7 +214,7 @@ struct ContentView: View {
         case .some(false):
             return "Server offline"
         case .none:
-            return "Prüfen…"
+            return "PrÃ¼fenâ€¦"
         }
     }
 
@@ -243,9 +223,9 @@ struct ContentView: View {
         case .some(true):
             return activeServer == .videoLoader ? "Lokaler Server online" : "Cloud-Server online"
         case .some(false):
-            return "Server offline. Zum erneuten Prüfen doppeltippen."
+            return "Server offline. Zum erneuten PrÃ¼fen doppeltippen."
         case .none:
-            return "Serverstatus wird geprüft"
+            return "Serverstatus wird geprÃ¼ft"
         }
     }
 
@@ -255,7 +235,7 @@ struct ContentView: View {
         VStack(alignment: .leading, spacing: AppGlassSpacing.md) {
             GlassInputField(
                 label: "Video-Link",
-                placeholder: "Link hier einfügen",
+                placeholder: "Link hier einfÃ¼gen",
                 text: $videoLink,
                 keyboardType: .URL,
                 textContentType: .URL,
@@ -270,7 +250,7 @@ struct ContentView: View {
                             .foregroundStyle(AppGlassColors.textSecondary)
                     }
                     .frame(minWidth: AppGlassTheme.controlHeight, minHeight: AppGlassTheme.controlHeight)
-                    .accessibilityLabel("Link aus Zwischenablage einfügen")
+                    .accessibilityLabel("Link aus Zwischenablage einfÃ¼gen")
                 } else {
                     Button {
                         videoLink = ""
@@ -291,7 +271,7 @@ struct ContentView: View {
                     .font(AppGlassTypography.footnote)
                     .foregroundStyle(AppGlassColors.warning)
             } else if !cleanedLink.isEmpty && !Self.looksLikeWebURL(cleanedLink) {
-                Label("Bitte füge einen gültigen Video-Link ein.", systemImage: "exclamationmark.circle.fill")
+                Label("Bitte fÃ¼ge einen gÃ¼ltigen Video-Link ein.", systemImage: "exclamationmark.circle.fill")
                     .font(AppGlassTypography.footnote)
                     .foregroundStyle(AppGlassColors.warning)
             }
@@ -304,10 +284,10 @@ struct ContentView: View {
                         HStack(spacing: AppGlassSpacing.sm) {
                             ProgressView()
                                 .tint(.white)
-                            Text("Video wird geprüft…")
+                            Text("Video wird geprÃ¼ftâ€¦")
                         }
                     } else {
-                        Label("Prüfen", systemImage: "magnifyingglass")
+                        Label("PrÃ¼fen", systemImage: "magnifyingglass")
                     }
                 }
                 .buttonStyle(GlassPrimaryButtonStyle())
@@ -317,7 +297,7 @@ struct ContentView: View {
                     Button {
                         pasteFromClipboard()
                     } label: {
-                        Label("Einfügen", systemImage: "doc.on.clipboard")
+                        Label("EinfÃ¼gen", systemImage: "doc.on.clipboard")
                     }
                     .buttonStyle(GlassSecondaryButtonStyle())
                 }
@@ -378,17 +358,17 @@ struct ContentView: View {
         }
     }
 
-    // MARK: - Qualität
+    // MARK: - QualitÃ¤t
 
     private func qualitySection(_ info: VideoInfo) -> some View {
         VStack(alignment: .leading, spacing: AppGlassSpacing.md) {
-            AppGlassSectionHeader(title: "Qualität")
+            AppGlassSectionHeader(title: "QualitÃ¤t")
 
             if info.qualities.isEmpty {
                 GlassStatusBanner(
                     tone: .warning,
-                    title: "Keine Qualitätsliste verfügbar",
-                    message: "Die App verwendet beim Download die beste Qualität, die der aktive Server bereitstellt."
+                    title: "Keine QualitÃ¤tsliste verfÃ¼gbar",
+                    message: "Die App verwendet beim Download die beste QualitÃ¤t, die der aktive Server bereitstellt."
                 )
             } else {
                 Button {
@@ -396,7 +376,7 @@ struct ContentView: View {
                 } label: {
                     HStack(spacing: AppGlassSpacing.md) {
                         VStack(alignment: .leading, spacing: AppGlassSpacing.xs) {
-                            Text("Qualität auswählen")
+                            Text("QualitÃ¤t auswÃ¤hlen")
                                 .font(AppGlassTypography.headline)
                                 .foregroundStyle(AppGlassColors.textPrimary)
                             Text(selectedQualitySummary)
@@ -419,16 +399,16 @@ struct ContentView: View {
                     )
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Qualität auswählen")
+                .accessibilityLabel("QualitÃ¤t auswÃ¤hlen")
 
                 if info.hasLimitedQualities {
                     GlassStatusBanner(
                         tone: .warning,
-                        title: "Nur begrenzte Qualität verfügbar",
-                        message: "Der aktuelle Server liefert für dieses Video keine höheren Qualitätsoptionen."
+                        title: "Nur begrenzte QualitÃ¤t verfÃ¼gbar",
+                        message: "Der aktuelle Server liefert fÃ¼r dieses Video keine hÃ¶heren QualitÃ¤tsoptionen."
                     )
                 } else if selectedQuality?.isAutomatic == true {
-                    Text("Automatisch lädt die beste verfügbare Qualität des aktiven Servers.")
+                    Text("Automatisch lÃ¤dt die beste verfÃ¼gbare QualitÃ¤t des aktiven Servers.")
                         .font(AppGlassTypography.footnote)
                         .foregroundStyle(AppGlassColors.textSecondary)
                 }
@@ -437,12 +417,12 @@ struct ContentView: View {
     }
 
     private var selectedQualitySummary: String {
-        guard let selectedQuality else { return "Beste verfügbare Qualität" }
+        guard let selectedQuality else { return "Beste verfÃ¼gbare QualitÃ¤t" }
         if selectedQuality.isAutomatic {
-            return "Automatisch · beste verfügbare Qualität"
+            return "Automatisch Â· beste verfÃ¼gbare QualitÃ¤t"
         }
         let detail = selectedQuality.detailText
-        return detail.isEmpty ? selectedQuality.label : "\(selectedQuality.label) · \(detail)"
+        return detail.isEmpty ? selectedQuality.label : "\(selectedQuality.label) Â· \(detail)"
     }
 
     // MARK: - Download
@@ -471,7 +451,7 @@ struct ContentView: View {
         } else {
             ZStack {
                 AppGlassBackground()
-                Text("Für dieses Video ist keine Vorschau verfügbar.")
+                Text("FÃ¼r dieses Video ist keine Vorschau verfÃ¼gbar.")
                     .font(AppGlassTypography.body)
                     .foregroundStyle(AppGlassColors.textSecondary)
                     .padding()
@@ -484,12 +464,12 @@ struct ContentView: View {
     private func pasteFromClipboard() {
         guard let pasted = UIPasteboard.general.string?.trimmingCharacters(in: .whitespacesAndNewlines),
               !pasted.isEmpty else {
-            linkValidationMessage = "Die Zwischenablage enthält keinen Link."
+            linkValidationMessage = "Die Zwischenablage enthÃ¤lt keinen Link."
             clipboardHasLink = false
             return
         }
         guard Self.looksLikeWebURL(pasted) else {
-            linkValidationMessage = "Die Zwischenablage enthält keinen gültigen Video-Link."
+            linkValidationMessage = "Die Zwischenablage enthÃ¤lt keinen gÃ¼ltigen Video-Link."
             clipboardHasLink = false
             return
         }
@@ -547,7 +527,7 @@ struct ContentView: View {
         } catch let error as APIError {
             errorMessage = error.errorDescription
         } catch {
-            errorMessage = "Das Video konnte nicht geprüft werden: \(error.localizedDescription)"
+            errorMessage = "Das Video konnte nicht geprÃ¼ft werden: \(error.localizedDescription)"
         }
     }
 
@@ -556,7 +536,7 @@ struct ContentView: View {
             guard validateVideoInput() else { return }
             let api = ServerAPI(kind: activeServer, baseURL: activeBaseURL)
             let url = try api.downloadURL(for: cleanedLink, quality: selectedQuality)
-            let fallback = try? api.downloadURL(for: cleanedLink, quality: nil)
+            let fallback: URL? = nil // Die gewählte Auflösung nicht automatisch überschreiten.
             let title = info?.title ?? "Video"
             queue.enqueue(
                 title: title,
@@ -581,7 +561,7 @@ struct ContentView: View {
 
     private func validateVideoInput() -> Bool {
         guard !cleanedLink.isEmpty, Self.looksLikeWebURL(cleanedLink) else {
-            linkValidationMessage = "Bitte füge einen gültigen Video-Link ein."
+            linkValidationMessage = "Bitte fÃ¼ge einen gÃ¼ltigen Video-Link ein."
             return false
         }
         let lowercased = cleanedLink.lowercased()
@@ -613,25 +593,19 @@ struct ContentView: View {
         return qualities.first
     }
 
-    private func migrateLocalServerURLTo9876IfNeeded() {
-        let current = macServerURL.trimmingCharacters(in: .whitespacesAndNewlines)
-        var lowercased = current.lowercased()
-        while lowercased.hasSuffix("/") {
-            lowercased.removeLast()
-        }
-        let knownBadValues: Set<String> = [
-            "",
-            "http://158.101.168.11:8765",
-            "http://100.80.105.62:8765",
-            "/api/health",
+    private func removeBundledServerAddresses() {
+        let bundled: Set<String> = [
+            "http://100.80.105.62:9876", "http://100.80.105.62:8765",
+            "http://158.101.168.11:8765", "http://192.168.1.23:8000"
         ]
-        if knownBadValues.contains(current) ||
-            lowercased.contains("/api/health") ||
-            lowercased.contains("/api/info") ||
-            lowercased.contains("/api/download") ||
-            lowercased.contains("youtube.com") ||
-            lowercased.contains("youtu.be") {
-            macServerURL = Self.defaultLocalServerURL
+        func isBundled(_ value: String) -> Bool {
+            bundled.contains(value.trimmingCharacters(in: .whitespacesAndNewlines)
+                .trimmingCharacters(in: CharacterSet(charactersIn: "/")).lowercased())
+        }
+        if isBundled(macServerURL) { macServerURL = "" }
+        if isBundled(cloudServerURL) { cloudServerURL = "" }
+        if activeServer == .vidSave && cloudServerURL.isEmpty {
+            activeServerRaw = ServerKind.videoLoader.rawValue
         }
     }
 
@@ -665,7 +639,7 @@ struct ContentView: View {
     }
 }
 
-// MARK: - Qualitätssheet
+// MARK: - QualitÃ¤tssheet
 
 private struct QualityPickerSheet: View {
     let info: VideoInfo
@@ -674,8 +648,8 @@ private struct QualityPickerSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     private var recommended: QualityOption? {
-        info.qualities.first(where: { !$0.isAutomatic && !$0.isAudioOnly }) ??
-            info.qualities.first(where: { $0.isAutomatic }) ??
+        info.qualities.first(where: { $0.isAutomatic }) ??
+            info.qualities.first(where: { !$0.isAudioOnly }) ??
             info.qualities.first
     }
 
@@ -708,8 +682,8 @@ private struct QualityPickerSheet: View {
                     if info.hasLimitedQualities {
                         GlassStatusBanner(
                             tone: .warning,
-                            title: "Nur begrenzte Qualität verfügbar",
-                            message: "Der aktuelle Server liefert für dieses Video keine höheren Qualitätsoptionen."
+                            title: "Nur begrenzte QualitÃ¤t verfÃ¼gbar",
+                            message: "Der aktuelle Server liefert fÃ¼r dieses Video keine hÃ¶heren QualitÃ¤tsoptionen."
                         )
                     }
 
@@ -717,7 +691,7 @@ private struct QualityPickerSheet: View {
                         GlassStatusBanner(
                             tone: .neutral,
                             title: "Automatisch",
-                            message: "Die App lädt automatisch die beste verfügbare Qualität."
+                            message: "Die App lÃ¤dt automatisch die beste verfÃ¼gbare QualitÃ¤t."
                         )
                     }
                 }
@@ -725,7 +699,7 @@ private struct QualityPickerSheet: View {
                 .padding(.bottom, AppGlassSpacing.xl)
             }
             .background(AppGlassBackground())
-            .navigationTitle("Qualität auswählen")
+            .navigationTitle("QualitÃ¤t auswÃ¤hlen")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -758,7 +732,7 @@ private struct QualityPickerSheet: View {
                     Text(option.label)
                         .font(AppGlassTypography.headline)
                         .foregroundStyle(AppGlassColors.textPrimary)
-                    Text(option.isAutomatic ? "Beste verfügbare Qualität" : option.detailText)
+                    Text(option.isAutomatic ? "Beste verfÃ¼gbare QualitÃ¤t" : option.detailText)
                         .font(AppGlassTypography.footnote)
                         .foregroundStyle(AppGlassColors.textSecondary)
                 }
@@ -784,7 +758,7 @@ private struct QualityPickerSheet: View {
             )
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(option.label), \(option.isAutomatic ? "automatisch beste Qualität" : option.detailText)")
+        .accessibilityLabel("\(option.label), \(option.isAutomatic ? "automatisch beste QualitÃ¤t" : option.detailText)")
     }
 }
 

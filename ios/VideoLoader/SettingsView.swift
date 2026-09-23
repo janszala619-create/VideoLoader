@@ -8,10 +8,11 @@ struct SettingsView: View {
 
     @State private var localStatus: ConnectionStatus = .unknown
     @State private var cloudStatus: ConnectionStatus = .unknown
-    @State private var advancedExpanded = false
+    @State private var advancedExpanded = true
+    @State private var connectionMessage: String?
 
-    private static let defaultLocalServerURL = "http://100.80.105.62:9876"
-    private static let defaultCloudServerURL = "http://158.101.168.11:8765"
+    private static let defaultLocalServerURL = "http://192.168.1.10:9876"
+    private static let defaultCloudServerURL = "https://dein-eigener-server.example"
 
     var body: some View {
         NavigationStack {
@@ -21,18 +22,23 @@ struct SettingsView: View {
                     activeServerCard
                     connectionCard(
                         title: "Lokaler Server",
-                        subtitle: "Empfohlen für YouTube im selben WLAN.",
+                        subtitle: "Empfohlen fÃ¼r YouTube im selben WLAN.",
                         url: macServerURL,
                         status: localStatus,
                         kind: .videoLoader
                     )
                     connectionCard(
                         title: "Cloud-Server",
-                        subtitle: "Überall erreichbar, aber je nach Quelle weniger zuverlässig.",
+                        subtitle: "Ãœberall erreichbar, aber je nach Quelle weniger zuverlÃ¤ssig.",
                         url: cloudServerURL,
                         status: cloudStatus,
                         kind: .vidSave
                     )
+                    if let connectionMessage {
+                        Text(connectionMessage)
+                            .font(AppGlassTypography.footnote)
+                            .foregroundStyle(AppGlassColors.textSecondary)
+                    }
                     advancedCard
                 }
                 .padding(AppGlassTheme.screenPadding)
@@ -55,7 +61,7 @@ struct SettingsView: View {
             Text("Verbindung")
                 .font(AppGlassTypography.largeTitle)
                 .foregroundStyle(AppGlassColors.textPrimary)
-            Text("Wähle den Server, der am zuverlässigsten zu deinem Setup passt.")
+            Text("Starte server/start.ps1 auf deinem Windows-PC und trage die angezeigte WLAN-Adresse ein.")
                 .font(AppGlassTypography.body)
                 .foregroundStyle(AppGlassColors.textSecondary)
         }
@@ -102,7 +108,7 @@ struct SettingsView: View {
             Button {
                 Task { await testConnection(kind) }
             } label: {
-                Label(status == .testing ? "Verbindung wird getestet…" : "Verbindung testen",
+                Label(status == .testing ? "Verbindung wird getestetâ€¦" : "Verbindung testen",
                       systemImage: status == .testing ? "hourglass" : "network")
             }
             .buttonStyle(GlassSecondaryButtonStyle())
@@ -118,28 +124,28 @@ struct SettingsView: View {
                         title: "Lokaler Server",
                         text: $macServerURL,
                         placeholder: Self.defaultLocalServerURL,
-                        helperText: "Standard-Port für den lokalen VideoLoader-Server: 9876."
+                        helperText: "Standard-Port fÃ¼r den lokalen VideoLoader-Server: 9876."
                     )
                     editableServerField(
                         title: "Cloud-Server",
                         text: $cloudServerURL,
                         placeholder: Self.defaultCloudServerURL,
-                        helperText: "Legacy/VidSave bleibt separat und nutzt Port 8765."
+                        helperText: "Optional: nur einen eigenen kompatiblen VidSave-Server eintragen."
                     )
                     Button(role: .destructive) {
-                        macServerURL = Self.defaultLocalServerURL
-                        cloudServerURL = Self.defaultCloudServerURL
+                        macServerURL = ""
+                        cloudServerURL = ""
                         localStatus = .unknown
                         cloudStatus = .unknown
                     } label: {
-                        Label("Standardwerte zurücksetzen", systemImage: "arrow.counterclockwise")
+                        Label("Server-Adressen leeren", systemImage: "arrow.counterclockwise")
                     }
                     .buttonStyle(.borderless)
                     .foregroundStyle(AppGlassColors.error)
                 }
                 .padding(.top, AppGlassSpacing.md)
             } label: {
-                Text("Erweitert")
+                Text("Server-Adresse eingeben")
                     .font(AppGlassTypography.headline)
                     .foregroundStyle(AppGlassColors.textPrimary)
             }
@@ -191,8 +197,14 @@ struct SettingsView: View {
     private func testConnection(_ kind: ServerKind) async {
         setStatus(.testing, for: kind)
         let baseURL = kind == .videoLoader ? macServerURL : cloudServerURL
-        let isReachable = await ServerAPI(kind: kind, baseURL: baseURL).isReachable()
-        setStatus(isReachable ? .online : .offline, for: kind)
+        connectionMessage = nil
+        do {
+            connectionMessage = try await ServerAPI(kind: kind, baseURL: baseURL).checkConnection()
+            setStatus(.online, for: kind)
+        } catch {
+            connectionMessage = error.localizedDescription
+            setStatus(.offline, for: kind)
+        }
     }
 
     @MainActor
@@ -235,7 +247,7 @@ private enum ConnectionStatus: Equatable {
         case .unknown:
             return "Unbekannt"
         case .testing:
-            return "Prüfen…"
+            return "PrÃ¼fenâ€¦"
         case .online:
             return kind == .videoLoader ? "Lokal online" : "Cloud online"
         case .offline:
@@ -248,7 +260,7 @@ private enum ConnectionStatus: Equatable {
         case .unknown:
             return "Serverstatus unbekannt"
         case .testing:
-            return "Serverstatus wird geprüft"
+            return "Serverstatus wird geprÃ¼ft"
         case .online:
             return kind == .videoLoader ? "Lokaler Server online" : "Cloud-Server online"
         case .offline:
@@ -259,8 +271,8 @@ private enum ConnectionStatus: Equatable {
 
 #Preview {
     SettingsView(
-        macServerURL: .constant("http://100.80.105.62:9876"),
-        cloudServerURL: .constant("http://158.101.168.11:8765"),
+        macServerURL: .constant("http://192.168.1.10:9876"),
+        cloudServerURL: .constant("https://dein-eigener-server.example"),
         activeServerRaw: .constant(ServerKind.videoLoader.rawValue)
     )
 }

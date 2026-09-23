@@ -11,9 +11,9 @@ enum APIError: LocalizedError {
         case .missingServer:
             return "Bitte zuerst die Server-Adresse in den Einstellungen (Zahnrad oben rechts) eintragen."
         case .badURL:
-            return "Die Server-Adresse oder der Video-Link ist ungültig."
+            return "Die Server-Adresse oder der Video-Link ist ungÃ¼ltig."
         case .unreachable:
-            return "Der Server ist nicht erreichbar. Läuft er und stimmt die Adresse in den Einstellungen?"
+            return "Der Server ist nicht erreichbar. LÃ¤uft er und stimmt die Adresse in den Einstellungen?"
         case .server(let message):
             return message
         }
@@ -24,7 +24,7 @@ struct ServerAPI {
     let kind: ServerKind
     let baseURL: String
 
-    private static let videoURLInServerFieldMessage = "Bitte gib einen YouTube-Link ins Linkfeld ein. Die Server-Adresse gehört in die Einstellungen."
+    private static let videoURLInServerFieldMessage = "Bitte gib einen Video-Link ins Linkfeld ein. Die Server-Adresse gehÃ¶rt in die Einstellungen."
 
     private static let session: URLSession = {
         let config = URLSessionConfiguration.default
@@ -40,7 +40,11 @@ struct ServerAPI {
         if !trimmed.lowercased().hasPrefix("http") {
             trimmed = "http://" + trimmed
         }
-        guard let components = URLComponents(string: trimmed) else { throw APIError.badURL }
+        guard let components = URLComponents(string: trimmed),
+              let host = components.host, !host.isEmpty,
+              ["http", "https"].contains(components.scheme?.lowercased() ?? ""),
+              components.user == nil, components.password == nil,
+              components.query == nil, components.fragment == nil else { throw APIError.badURL }
         if Self.containsServerAPIPath(components.path) || Self.looksLikeKnownVideoPage(trimmed) {
             throw APIError.server(Self.videoURLInServerFieldMessage)
         }
@@ -157,27 +161,43 @@ struct ServerAPI {
         }
     }
 
-    // MARK: - Erreichbarkeit (für die Server-Ampel)
+    // MARK: - Erreichbarkeit (fÃ¼r die Server-Ampel)
 
-    /// Prüft mit kurzem Zeitlimit, ob der Server antwortet. Jede HTTP-Antwort
-    /// (auch 404) zählt als erreichbar – nur ein Verbindungsfehler ist „offline“.
+    /// PrÃ¼ft HTTP-Status und die Bereitschaft des passenden Servers.
     func isReachable() async -> Bool {
-        var components: URLComponents
-        do { components = try normalizedBase() } catch { return false }
-        components.path = kind == .videoLoader ? "/api/health" : "/health"
-        guard let healthURL = components.url else { return false }
+        do { _ = try await checkConnection(); return true } catch { return false }
+    }
 
+    /// Gibt Hinweise zurück, wenn nur bestimmte Quellen eingeschränkt sind.
+    func checkConnection() async throws -> String? {
+        var components = try normalizedBase()
+        components.path = kind == .videoLoader ? "/api/health" : "/health"
+        guard let healthURL = components.url else { throw APIError.badURL }
         var request = URLRequest(url: healthURL)
         request.timeoutInterval = 6
-        let config = URLSessionConfiguration.ephemeral
-        config.timeoutIntervalForRequest = 6
-        let session = URLSession(configuration: config)
-        do {
-            let (_, response) = try await session.data(for: request)
-            return response is HTTPURLResponse
-        } catch {
-            return false
+        let session = URLSession(configuration: .ephemeral)
+        defer { session.invalidateAndCancel() }
+        let (data, response): (Data, URLResponse)
+        do { (data, response) = try await session.data(for: request) }
+        catch { throw APIError.unreachable }
+        guard let http = response as? HTTPURLResponse,
+              (200...299).contains(http.statusCode) else {
+            throw APIError.server("An dieser Adresse antwortet kein passender Server. Adresse und Port prüfen.")
         }
+        if kind == .videoLoader {
+            guard let health = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  health["server_name"] as? String == "VideoLoader local server" else {
+                throw APIError.server("Dies ist kein VideoLoader-Server. Bitte die Adresse aus start.ps1 eintragen.")
+            }
+            guard health["status"] as? String == "ok" else {
+                throw APIError.server("Server erreichbar, aber nicht bereit. ffmpeg, ffprobe und freien PC-Speicher mit start.ps1 -CheckOnly prüfen.")
+            }
+            if let runtime = health["javascript_runtime"] as? [String: Any],
+               runtime["available"] as? Bool == false {
+                return "Für YouTube fehlt Deno ab Version 2.3 auf dem PC. Andere Quellen können funktionieren."
+            }
+        }
+        return nil
     }
 
     // MARK: - Hilfen
@@ -255,7 +275,7 @@ struct ServerAPI {
         }
     }
 
-    /// Liest die Pixelhöhe aus Angaben wie "480p" oder "1080p60".
+    /// Liest die PixelhÃ¶he aus Angaben wie "480p" oder "1080p60".
     private static func parseHeight(_ quality: String?) -> Int? {
         guard let quality else { return nil }
         let digits = quality.prefix { $0.isNumber }
@@ -342,7 +362,7 @@ struct ServerAPI {
 
     private static func decodeMessage(_ error: Error) -> String {
         if case DecodingError.keyNotFound(let key, _) = error {
-            return "Feld „\(key.stringValue)“ fehlt."
+            return "Feld â€ž\(key.stringValue)â€œ fehlt."
         }
         return error.localizedDescription
     }
@@ -359,7 +379,7 @@ struct ServerAPI {
             throw APIError.server(payload.detail)
         }
         if http.statusCode == 422 {
-            throw APIError.server("Der Server konnte die Download-Anfrage nicht verarbeiten. Bitte prüfe Server-Typ und Server-Adresse in den Einstellungen.")
+            throw APIError.server("Der Server konnte die Download-Anfrage nicht verarbeiten. Bitte prÃ¼fe Server-Typ und Server-Adresse in den Einstellungen.")
         }
         throw APIError.server("Der Server hat einen Fehler gemeldet (Code \(http.statusCode)).")
     }
@@ -449,8 +469,8 @@ struct ServerErrorDTO: Decodable {
             if let requestId = error.requestId {
                 msg += " (Fehler-ID: \(requestId))"
             }
-            // Den echten technischen Grund anhängen, wenn der Server ihn
-            // mitgeschickt hat – so ist der Fehler ohne Server-Log erkennbar.
+            // Den echten technischen Grund anhÃ¤ngen, wenn der Server ihn
+            // mitgeschickt hat â€“ so ist der Fehler ohne Server-Log erkennbar.
             if let exType = error.exceptionType, !exType.isEmpty {
                 msg += "\n\(exType)"
                 if let d = error.detail, !d.isEmpty {

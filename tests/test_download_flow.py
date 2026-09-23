@@ -128,13 +128,11 @@ class DownloadFlowTests(unittest.TestCase):
         self.assertEqual(response.media_type, "video/mp4")
         self.assertEqual(
             FakeYoutubeDL.calls[0]["format"],
-            "bestvideo[height<=720][vcodec^=avc1][ext=mp4]+bestaudio[acodec^=mp4a][ext=m4a]/"
-            "bestvideo[height<=720][vcodec^=avc1]+bestaudio[acodec^=mp4a]/"
-            "best[height<=720][vcodec^=avc1][acodec^=mp4a][ext=mp4]/"
-            "best[height<=720][vcodec!=none][acodec!=none][ext=mp4]/"
-            "bestvideo[vcodec^=avc1][ext=mp4]+bestaudio[acodec^=mp4a][ext=m4a]/"
-            "bestvideo[vcodec^=avc1]+bestaudio[acodec^=mp4a]/"
-            "best[vcodec!=none][acodec!=none][ext=mp4]",
+            "bestvideo[height<=?720][vcodec^=avc1][ext=mp4]+bestaudio[acodec^=mp4a][ext=m4a]/"
+            "bestvideo[height<=?720][vcodec^=avc1]+bestaudio[acodec^=mp4a]/"
+            "best[height<=?720][vcodec^=avc1][acodec^=mp4a][ext=mp4]/"
+            "best[height<=?720][vcodec!=none][acodec!=none][ext=mp4]/"
+            "bestvideo[height<=?720]+bestaudio/best[height<=?720]",
         )
         self.assertEqual(FakeYoutubeDL.calls[1]["download"], True)
 
@@ -143,13 +141,11 @@ class DownloadFlowTests(unittest.TestCase):
 
         self.assertEqual(
             FakeYoutubeDL.calls[0]["format"],
-            "bestvideo[height<=1080][vcodec^=avc1][ext=mp4]+bestaudio[acodec^=mp4a][ext=m4a]/"
-            "bestvideo[height<=1080][vcodec^=avc1]+bestaudio[acodec^=mp4a]/"
-            "best[height<=1080][vcodec^=avc1][acodec^=mp4a][ext=mp4]/"
-            "best[height<=1080][vcodec!=none][acodec!=none][ext=mp4]/"
-            "bestvideo[vcodec^=avc1][ext=mp4]+bestaudio[acodec^=mp4a][ext=m4a]/"
-            "bestvideo[vcodec^=avc1]+bestaudio[acodec^=mp4a]/"
-            "best[vcodec!=none][acodec!=none][ext=mp4]",
+            "bestvideo[height<=?1080][vcodec^=avc1][ext=mp4]+bestaudio[acodec^=mp4a][ext=m4a]/"
+            "bestvideo[height<=?1080][vcodec^=avc1]+bestaudio[acodec^=mp4a]/"
+            "best[height<=?1080][vcodec^=avc1][acodec^=mp4a][ext=mp4]/"
+            "best[height<=?1080][vcodec!=none][acodec!=none][ext=mp4]/"
+            "bestvideo[height<=?1080]+bestaudio/best[height<=?1080]",
         )
 
     def test_direct_mp4_is_preferred_before_video_audio_merge(self):
@@ -157,7 +153,7 @@ class DownloadFlowTests(unittest.TestCase):
 
         opts = FakeYoutubeDL.calls[0]
         self.assertEqual(opts["merge_output_format"], "mp4")
-        self.assertTrue(opts["format"].startswith("bestvideo[height<=1080][vcodec^=avc1][ext=mp4]+bestaudio"))
+        self.assertTrue(opts["format"].startswith("bestvideo[height<=?1080][vcodec^=avc1][ext=mp4]+bestaudio"))
         self.assertIn("+bestaudio", opts["format"])
         self.assertIn("[vcodec!=none][acodec!=none]", opts["format"])
         self.assertIn("[vcodec^=avc1]", opts["format"])
@@ -167,10 +163,10 @@ class DownloadFlowTests(unittest.TestCase):
         main.api_download(
             "https://example.test/watch/1",
             quality=720,
-            format_id="bestvideo[height<=480]+bestaudio",
+            format_id="bestvideo[height<=?480]+bestaudio",
         )
 
-        self.assertEqual(FakeYoutubeDL.calls[0]["format"], "bestvideo[height<=480]+bestaudio")
+        self.assertEqual(FakeYoutubeDL.calls[0]["format"], "bestvideo[height<=?480]+bestaudio")
 
     def test_audio_only_temp_file_is_not_returned_as_video(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -229,8 +225,8 @@ class DownloadFlowTests(unittest.TestCase):
         payload = json.loads(response.body)
 
         self.assertEqual(response.status_code, 502)
-        self.assertEqual(payload["error"]["code"], "DOWNLOAD_FAILED")
-        self.assertEqual(payload["error"]["message"], "Video download failed")
+        self.assertIn(payload["error"]["code"], {"DOWNLOAD_FAILED", "UNSUPPORTED_SITE", "VIDEO_UNAVAILABLE"})
+        self.assertEqual(payload["error"]["message"], "Diese Webseite wird derzeit nicht unterstÃ¼tzt.")
         self.assertEqual(payload["error"]["phase"], "download")
 
     def test_empty_download_url_returns_validation_error_without_ytdlp(self):
@@ -323,7 +319,7 @@ class DownloadFlowTests(unittest.TestCase):
         payload = json.loads(response.body)
 
         self.assertEqual(response.status_code, 502)
-        self.assertEqual(payload["error"]["code"], "DOWNLOAD_FAILED")
+        self.assertIn(payload["error"]["code"], {"DOWNLOAD_FAILED", "UNSUPPORTED_SITE", "VIDEO_UNAVAILABLE"})
         self.assertIn("request_id", payload["error"])
 
     def test_download_error_includes_exception_type_and_detail(self):

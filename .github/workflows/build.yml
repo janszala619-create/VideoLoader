@@ -3,11 +3,18 @@ name: Build
 on:
   push:
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   server:
     name: Server syntax check
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
 
     steps:
       - name: Check out repository
@@ -19,7 +26,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install server dependencies
-        run: pip install -r server/requirements.txt
+        run: pip install -r server/requirements.txt httpx
 
       - name: Compile server
         run: python -m py_compile server/main.py
@@ -29,11 +36,21 @@ jobs:
 
   ios:
     name: iOS IPA build
-    runs-on: macos-latest
+    runs-on: macos-15
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+
+      - name: Build for simulator
+        shell: bash
+        run: |
+          mkdir -p build/logs
+          set -o pipefail
+          xcodebuild -project ios/VideoLoader.xcodeproj -scheme VideoLoader \
+            -configuration Debug -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO build 2>&1 | tee build/logs/simulator.log
 
       - name: Build app for iPhone
         shell: bash
@@ -69,8 +86,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          APP_PATH="$(find build -type d -name VideoLoader.app | head -n 1)"
-          if [ -z "$APP_PATH" ]; then
+          APP_PATH="$PWD/build/Release-iphoneos/VideoLoader.app"
+          if [ ! -d "$APP_PATH" ]; then
             echo "::error::Could not find VideoLoader.app in build output."
             exit 1
           fi
@@ -88,6 +105,7 @@ jobs:
           if-no-files-found: error
 
       - name: Upload build logs artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: VideoLoader-build-logs

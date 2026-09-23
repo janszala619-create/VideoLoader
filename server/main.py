@@ -1,4 +1,4 @@
-"""VideoLoader-Server: liefert Videoinfos und Downloads über yt-dlp."""
+"""VideoLoader-Server: liefert Videoinfos und Downloads ÃƒÂ¼ber yt-dlp."""
 
 import json
 import logging
@@ -9,6 +9,7 @@ import subprocess
 import tempfile
 import traceback
 import uuid
+from functools import lru_cache
 from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
 from urllib.parse import unquote as urllib_unquote
@@ -36,7 +37,7 @@ _NORMALIZATION_TARGET = {
 
 @app.get("/")
 def root():
-    return {"status": "ok", "hinweis": "VideoLoader-Server läuft. Diese Adresse in der App eintragen."}
+    return {"status": "ok", "hinweis": "VideoLoader-Server lÃƒÂ¤uft. Diese Adresse in der App eintragen."}
 
 
 @app.get("/health")
@@ -60,6 +61,7 @@ def health(request: Request = None):
         "output_dir": diagnostics["output_dir"]["path"],
         "output_dir_writable": diagnostics["output_dir"]["writable"],
         "normalization_target": _NORMALIZATION_TARGET,
+        "javascript_runtime": diagnostics["javascript_runtime"],
     }
     logger.info(
         "VideoLoader /api/health requested port=%s yt_dlp=%s ffmpeg=%s ffprobe=%s output_dir=%s",
@@ -98,6 +100,47 @@ def _output_dir_status() -> dict[str, str | bool | None]:
         return {"path": str(OUTPUT_DIR), "writable": False, "error": str(exc)}
 
 
+@lru_cache(maxsize=1)
+def _javascript_runtime() -> dict:
+    path = shutil.which("deno")
+    version = None
+    if path:
+        try:
+            result = subprocess.run([path, "--version"], capture_output=True, text=True, timeout=5)
+            match = re.search(r"deno (\d+)\.(\d+)\.(\d+)", result.stdout)
+            if result.returncode == 0 and match:
+                version = match.group(0)
+                if tuple(map(int, match.groups())) >= (2, 3, 0):
+                    return {"available": True, "path": path, "version": version}
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+    return {"available": False, "path": path, "version": version,
+            "message": "Fuer YouTube Deno >= 2.3 installieren: winget install DenoLand.Deno"}
+
+
+def _reject_unsupported_video(info, *, incomplete=False):
+    if info.get("is_live") or info.get("live_status") in {"is_live", "is_upcoming"}:
+        return "Livestreams werden nicht unterstÃ¼tzt. Bitte ein abgeschlossenes Einzelvideo wÃ¤hlen."
+    if info.get("has_drm"):
+        return "DRM-geschÃ¼tzte Videos werden nicht unterstÃ¼tzt."
+    return None
+
+
+def _source_error(exc: Exception) -> tuple[str, str]:
+    text = str(exc).lower()
+    if any(word in text for word in ("sign in", "login", "log in", "cookies", "private video")):
+        return "LOGIN_REQUIRED", "Diese Quelle verlangt eine Anmeldung. Bitte ein Ã¶ffentliches Video wÃ¤hlen."
+    if "drm" in text:
+        return "DRM_PROTECTED", "DRM-geschÃ¼tzte Videos werden nicht unterstÃ¼tzt."
+    if "not available" in text or "unavailable" in text:
+        return "VIDEO_UNAVAILABLE", "Dieses Video ist nicht verfügbar oder für diesen Zugriff gesperrt."
+    if "unsupported url" in text:
+        return "UNSUPPORTED_SITE", "Diese Webseite wird derzeit nicht unterstÃ¼tzt."
+    if any(word in text for word in ("timed out", "connection", "resolve")):
+        return "SOURCE_UNREACHABLE", "Die Videoquelle ist nicht erreichbar. Bitte spÃ¤ter erneut versuchen."
+    return "DOWNLOAD_FAILED", "Das Video konnte nicht geladen werden. Quelle prÃ¼fen oder yt-dlp aktualisieren."
+
+
 def _diagnostics() -> dict:
     return {
         "status": "ok",
@@ -105,6 +148,7 @@ def _diagnostics() -> dict:
         "ffmpeg": _command_status("ffmpeg"),
         "ffprobe": _command_status("ffprobe"),
         "aria2c": _command_status("aria2c"),
+        "javascript_runtime": _javascript_runtime(),
         "output_dir": _output_dir_status(),
         "env": {
             "VIDEOLOADER_OUTPUT_DIR": os.getenv("VIDEOLOADER_OUTPUT_DIR"),
@@ -149,7 +193,7 @@ def _validate_video_url(url: str) -> str:
         raise HTTPException(status_code=400, detail="Bitte gib einen Video-Link ein.")
     parts = urlsplit(trimmed)
     if parts.scheme not in {"http", "https"} or not parts.netloc:
-        raise HTTPException(status_code=400, detail="Bitte gib einen gültigen http- oder https-Link ein.")
+        raise HTTPException(status_code=400, detail="Bitte gib einen gÃƒÂ¼ltigen http- oder https-Link ein.")
     return trimmed
 
 
@@ -159,7 +203,7 @@ def _invalid_video_url_response(request_id: str | None = None):
         content={
             "error": {
                 "code": "INVALID_VIDEO_URL",
-                "message": "Bitte gib einen YouTube-Link ins Linkfeld ein. Die Server-Adresse gehört in die Einstellungen.",
+                "message": "Bitte gib einen Video-Link ins Linkfeld ein. Die Server-Adresse gehÃƒÂ¶rt in die Einstellungen.",
                 "phase": "validation",
                 "request_id": request_id,
             }
@@ -241,7 +285,10 @@ def _base_ydl_options(url: str) -> dict:
         "no_warnings": True,
         "noplaylist": True,
         "http_headers": _http_headers(url),
-        "extractor_args": {"youtube": {"player_client": ["ios", "android", "web"]}},
+        "match_filter": _reject_unsupported_video,
+        "playlistend": 1,
+        "socket_timeout": 30,
+        "retries": 2,
         "logger": YtdlpLogger(),
     }
 
@@ -251,11 +298,11 @@ def _extract_info(url: str) -> dict:
     opts = _base_ydl_options(url)
     with yt_dlp.YoutubeDL(opts) as ydl:
         info = ydl.extract_info(url, download=False)
-    if info.get("_type") == "playlist":
-        entries = [e for e in (info.get("entries") or []) if e]
-        if not entries:
-            raise HTTPException(status_code=422, detail="Unter diesem Link wurde kein Video gefunden.")
-        info = entries[0]
+    if not info or info.get("_type") in {"playlist", "multi_video"}:
+        raise HTTPException(status_code=422, detail="Bitte einen Einzelvideo-Link statt einer Playlist eingeben.")
+    rejected = _reject_unsupported_video(info)
+    if rejected:
+        raise HTTPException(status_code=422, detail=rejected)
     return info
 
 
@@ -275,11 +322,9 @@ def api_info(
         info = _extract_info(url)
     except HTTPException:
         raise
-    except Exception as exc:  # yt-dlp wirft je nach Plattform verschiedene Fehler
-        raise HTTPException(
-            status_code=422,
-            detail=f"Dieser Link wird nicht unterstützt oder das Video ist nicht erreichbar. ({exc})",
-        )
+    except Exception as exc:
+        code, message = _source_error(exc)
+        return JSONResponse(status_code=422, content={"error": {"code": code, "message": message}})
 
     formats = info.get("formats") or []
     allowed_heights = {2160, 1440, 1080, 720, 480, 360, 240, 144}
@@ -293,7 +338,7 @@ def api_info(
         reverse=True,
     )
 
-    # Für die Vorschau ein direkt abspielbares MP4 (Bild + Ton) bis 720p suchen
+    # FÃƒÂ¼r die Vorschau ein direkt abspielbares MP4 (Bild + Ton) bis 720p suchen
     preview_url = None
     preview_height = -1
     for f in formats:
@@ -319,16 +364,14 @@ def api_info(
 
 
 def _format_selector(quality: int | None) -> str:
-    h = f"[height<={quality}]" if quality else ""
+    h = f"[height<=?{quality}]" if quality else ""
     return "/".join(
         [
             f"bestvideo{h}[vcodec^=avc1][ext=mp4]+bestaudio[acodec^=mp4a][ext=m4a]",
             f"bestvideo{h}[vcodec^=avc1]+bestaudio[acodec^=mp4a]",
             f"best{h}[vcodec^=avc1][acodec^=mp4a][ext=mp4]",
             f"best{h}[vcodec!=none][acodec!=none][ext=mp4]",
-            "bestvideo[vcodec^=avc1][ext=mp4]+bestaudio[acodec^=mp4a][ext=m4a]",
-            "bestvideo[vcodec^=avc1]+bestaudio[acodec^=mp4a]",
-            "best[vcodec!=none][acodec!=none][ext=mp4]",
+            f"bestvideo{h}+bestaudio/best{h}",
         ]
     )
 
@@ -529,17 +572,17 @@ def _download_options(url: str, tmpdir: str, format_selector: str) -> dict:
         "merge_output_format": "mp4",
         "retries": 5,
         "fragment_retries": 5,
-        # Bei in Häppchen aufgeteilten Quellen (HLS/DASH) so viele Stücke
-        # gleichzeitig laden wie sinnvoll möglich.
+        # Bei in HÃƒÂ¤ppchen aufgeteilten Quellen (HLS/DASH) so viele StÃƒÂ¼cke
+        # gleichzeitig laden wie sinnvoll mÃƒÂ¶glich.
         "concurrent_fragment_downloads": 16,
         "extractor_retries": 3,
         "file_access_retries": 3,
         "socket_timeout": 30,
     })
     if _ARIA2C_PATH:
-        # Für normale (nicht fragmentierte) Downloads nutzt aria2c mehrere
-        # parallele Verbindungen zur Quelle statt nur einer – oft der größte
-        # Geschwindigkeitsgewinn. Wird automatisch übersprungen, falls
+        # FÃƒÂ¼r normale (nicht fragmentierte) Downloads nutzt aria2c mehrere
+        # parallele Verbindungen zur Quelle statt nur einer Ã¢â‚¬â€œ oft der grÃƒÂ¶ÃƒÅ¸te
+        # Geschwindigkeitsgewinn. Wird automatisch ÃƒÂ¼bersprungen, falls
         # aria2c auf diesem Server nicht installiert ist.
         opts["external_downloader"] = "aria2c"
         opts["external_downloader_args"] = {
@@ -555,7 +598,7 @@ def _download_error_response(
 ):
     body: dict = {
         "code": "DOWNLOAD_FAILED",
-        "message": "Video download failed",
+        "message": "Das Video konnte nicht geladen werden.",
         "phase": "download",
         "request_id": request_id,
     }
@@ -566,6 +609,8 @@ def _download_error_response(
         body["exception_type"] = exception_type
     if detail:
         body["detail"] = detail
+        code, message = _source_error(Exception(detail))
+        body.update(code=code, message=message)
     return JSONResponse(status_code=502, content={"error": body})
 
 
@@ -621,8 +666,8 @@ def api_download(
     if not _ffprobe_path():
         return _missing_prerequisite_response(
             request_id,
-            "ffprobe wurde nicht gefunden. Bitte installiere ffmpeg vollständig und starte den Server neu.",
-            "ffprobe ist Teil von ffmpeg und wird benötigt, um die finale Videodatei zu prüfen.",
+            "ffprobe wurde nicht gefunden. Bitte installiere ffmpeg vollstÃƒÂ¤ndig und starte den Server neu.",
+            "ffprobe ist Teil von ffmpeg und wird benÃƒÂ¶tigt, um die finale Videodatei zu prÃƒÂ¼fen.",
         )
 
     requested_quality = quality if quality is not None else height
@@ -734,7 +779,7 @@ def api_download(
         return _download_error_response(
             request_id,
             exception_type="InvalidFinalVideo",
-            detail="Die erzeugte Datei enthält keinen abspielbaren iOS-kompatiblen Video-Track.",
+            detail="Die erzeugte Datei enthÃƒÂ¤lt keinen abspielbaren iOS-kompatiblen Video-Track.",
         )
 
     title = info.get("title") or "video"
