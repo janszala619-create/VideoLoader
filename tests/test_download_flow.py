@@ -226,7 +226,7 @@ class DownloadFlowTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 502)
         self.assertIn(payload["error"]["code"], {"DOWNLOAD_FAILED", "UNSUPPORTED_SITE", "VIDEO_UNAVAILABLE"})
-        self.assertEqual(payload["error"]["message"], "Diese Webseite wird derzeit nicht unterstÃ¼tzt.")
+        self.assertEqual(payload["error"]["message"], "Diese Webseite wird derzeit nicht unterstützt.")
         self.assertEqual(payload["error"]["phase"], "download")
 
     def test_empty_download_url_returns_validation_error_without_ytdlp(self):

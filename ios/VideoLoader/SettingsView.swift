@@ -22,14 +22,14 @@ struct SettingsView: View {
                     activeServerCard
                     connectionCard(
                         title: "Lokaler Server",
-                        subtitle: "Empfohlen fÃ¼r YouTube im selben WLAN.",
+                        subtitle: "Empfohlen für YouTube im selben WLAN.",
                         url: macServerURL,
                         status: localStatus,
                         kind: .videoLoader
                     )
                     connectionCard(
                         title: "Cloud-Server",
-                        subtitle: "Ãœberall erreichbar, aber je nach Quelle weniger zuverlÃ¤ssig.",
+                        subtitle: "Überall erreichbar, aber je nach Quelle weniger zuverlässig.",
                         url: cloudServerURL,
                         status: cloudStatus,
                         kind: .vidSave
@@ -108,7 +108,7 @@ struct SettingsView: View {
             Button {
                 Task { await testConnection(kind) }
             } label: {
-                Label(status == .testing ? "Verbindung wird getestetâ€¦" : "Verbindung testen",
+                Label(status == .testing ? "Verbindung wird getestet…" : "Verbindung testen",
                       systemImage: status == .testing ? "hourglass" : "network")
             }
             .buttonStyle(GlassSecondaryButtonStyle())
@@ -124,7 +124,7 @@ struct SettingsView: View {
                         title: "Lokaler Server",
                         text: $macServerURL,
                         placeholder: Self.defaultLocalServerURL,
-                        helperText: "Standard-Port fÃ¼r den lokalen VideoLoader-Server: 9876."
+                        helperText: "Standard-Port für den lokalen VideoLoader-Server: 9876."
                     )
                     editableServerField(
                         title: "Cloud-Server",
@@ -247,7 +247,7 @@ private enum ConnectionStatus: Equatable {
         case .unknown:
             return "Unbekannt"
         case .testing:
-            return "PrÃ¼fenâ€¦"
+            return "Prüfen…"
         case .online:
             return kind == .videoLoader ? "Lokal online" : "Cloud online"
         case .offline:
@@ -260,7 +260,7 @@ private enum ConnectionStatus: Equatable {
         case .unknown:
             return "Serverstatus unbekannt"
         case .testing:
-            return "Serverstatus wird geprÃ¼ft"
+            return "Serverstatus wird geprüft"
         case .online:
             return kind == .videoLoader ? "Lokaler Server online" : "Cloud-Server online"
         case .offline:

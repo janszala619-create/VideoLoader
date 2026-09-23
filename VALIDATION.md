@@ -8,6 +8,7 @@ Stand: 23. September 2026. Lokale Prüfung unter Windows; keine allgemeine Platt
 - Qualitätsauswahl zusätzlich mit dem echten yt-dlp-Formatselektor geprüft: fehlende Auflösungsmetadaten bleiben erlaubt, bekannte höhere Auflösungen werden ausgeschlossen.
 - Windows-Start mit tatsächlicher Installation einer neuen virtuellen Umgebung, ffmpeg/ffprobe 9.0.2, Deno 2.9.7 und yt-dlp 2026.8.19 erfolgreich auf Port 9876 ausgeführt.
 - Fehlender Python-Interpreter (Windows-Store-Platzhalter, Exit 9009) stoppt das Skript, statt eine erfolgreiche Installation vorzutäuschen.
+- Zusätzlich echte Konvertierung einer lokal erzeugten VP9/Opus-Datei zu H.264/yuv420p mit AAC durchgeführt und mit ffprobe geprüft.
 
 ## Echte HTTP-Downloads
 

@@ -11,9 +11,9 @@ enum APIError: LocalizedError {
         case .missingServer:
             return "Bitte zuerst die Server-Adresse in den Einstellungen (Zahnrad oben rechts) eintragen."
         case .badURL:
-            return "Die Server-Adresse oder der Video-Link ist ungÃ¼ltig."
+            return "Die Server-Adresse oder der Video-Link ist ungültig."
         case .unreachable:
-            return "Der Server ist nicht erreichbar. LÃ¤uft er und stimmt die Adresse in den Einstellungen?"
+            return "Der Server ist nicht erreichbar. Läuft er und stimmt die Adresse in den Einstellungen?"
         case .server(let message):
             return message
         }
@@ -24,7 +24,7 @@ struct ServerAPI {
     let kind: ServerKind
     let baseURL: String
 
-    private static let videoURLInServerFieldMessage = "Bitte gib einen Video-Link ins Linkfeld ein. Die Server-Adresse gehÃ¶rt in die Einstellungen."
+    private static let videoURLInServerFieldMessage = "Bitte gib einen Video-Link ins Linkfeld ein. Die Server-Adresse gehört in die Einstellungen."
 
     private static let session: URLSession = {
         let config = URLSessionConfiguration.default
@@ -161,9 +161,9 @@ struct ServerAPI {
         }
     }
 
-    // MARK: - Erreichbarkeit (fÃ¼r die Server-Ampel)
+    // MARK: - Erreichbarkeit (für die Server-Ampel)
 
-    /// PrÃ¼ft HTTP-Status und die Bereitschaft des passenden Servers.
+    /// Prüft HTTP-Status und die Bereitschaft des passenden Servers.
     func isReachable() async -> Bool {
         do { _ = try await checkConnection(); return true } catch { return false }
     }
@@ -275,7 +275,7 @@ struct ServerAPI {
         }
     }
 
-    /// Liest die PixelhÃ¶he aus Angaben wie "480p" oder "1080p60".
+    /// Liest die Pixelhöhe aus Angaben wie "480p" oder "1080p60".
     private static func parseHeight(_ quality: String?) -> Int? {
         guard let quality else { return nil }
         let digits = quality.prefix { $0.isNumber }
@@ -362,7 +362,7 @@ struct ServerAPI {
 
     private static func decodeMessage(_ error: Error) -> String {
         if case DecodingError.keyNotFound(let key, _) = error {
-            return "Feld â€ž\(key.stringValue)â€œ fehlt."
+            return "Feld „\(key.stringValue)“ fehlt."
         }
         return error.localizedDescription
     }
@@ -379,7 +379,7 @@ struct ServerAPI {
             throw APIError.server(payload.detail)
         }
         if http.statusCode == 422 {
-            throw APIError.server("Der Server konnte die Download-Anfrage nicht verarbeiten. Bitte prÃ¼fe Server-Typ und Server-Adresse in den Einstellungen.")
+            throw APIError.server("Der Server konnte die Download-Anfrage nicht verarbeiten. Bitte prüfe Server-Typ und Server-Adresse in den Einstellungen.")
         }
         throw APIError.server("Der Server hat einen Fehler gemeldet (Code \(http.statusCode)).")
     }
@@ -469,8 +469,8 @@ struct ServerErrorDTO: Decodable {
             if let requestId = error.requestId {
                 msg += " (Fehler-ID: \(requestId))"
             }
-            // Den echten technischen Grund anhÃ¤ngen, wenn der Server ihn
-            // mitgeschickt hat â€“ so ist der Fehler ohne Server-Log erkennbar.
+            // Den echten technischen Grund anhängen, wenn der Server ihn
+            // mitgeschickt hat – so ist der Fehler ohne Server-Log erkennbar.
             if let exType = error.exceptionType, !exType.isEmpty {
                 msg += "\n\(exType)"
                 if let d = error.detail, !d.isEmpty {

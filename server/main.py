@@ -1,4 +1,4 @@
-"""VideoLoader-Server: liefert Videoinfos und Downloads ÃƒÂ¼ber yt-dlp."""
+"""VideoLoader-Server: liefert Videoinfos und Downloads über yt-dlp."""
 
 import json
 import logging
@@ -37,7 +37,7 @@ _NORMALIZATION_TARGET = {
 
 @app.get("/")
 def root():
-    return {"status": "ok", "hinweis": "VideoLoader-Server lÃƒÂ¤uft. Diese Adresse in der App eintragen."}
+    return {"status": "ok", "hinweis": "VideoLoader-Server läuft. Diese Adresse in der App eintragen."}
 
 
 @app.get("/health")
@@ -120,25 +120,25 @@ def _javascript_runtime() -> dict:
 
 def _reject_unsupported_video(info, *, incomplete=False):
     if info.get("is_live") or info.get("live_status") in {"is_live", "is_upcoming"}:
-        return "Livestreams werden nicht unterstÃ¼tzt. Bitte ein abgeschlossenes Einzelvideo wÃ¤hlen."
+        return "Livestreams werden nicht unterstützt. Bitte ein abgeschlossenes Einzelvideo wählen."
     if info.get("has_drm"):
-        return "DRM-geschÃ¼tzte Videos werden nicht unterstÃ¼tzt."
+        return "DRM-geschützte Videos werden nicht unterstützt."
     return None
 
 
 def _source_error(exc: Exception) -> tuple[str, str]:
     text = str(exc).lower()
     if any(word in text for word in ("sign in", "login", "log in", "cookies", "private video")):
-        return "LOGIN_REQUIRED", "Diese Quelle verlangt eine Anmeldung. Bitte ein Ã¶ffentliches Video wÃ¤hlen."
+        return "LOGIN_REQUIRED", "Diese Quelle verlangt eine Anmeldung. Bitte ein öffentliches Video wählen."
     if "drm" in text:
-        return "DRM_PROTECTED", "DRM-geschÃ¼tzte Videos werden nicht unterstÃ¼tzt."
+        return "DRM_PROTECTED", "DRM-geschützte Videos werden nicht unterstützt."
     if "not available" in text or "unavailable" in text:
         return "VIDEO_UNAVAILABLE", "Dieses Video ist nicht verfügbar oder für diesen Zugriff gesperrt."
     if "unsupported url" in text:
-        return "UNSUPPORTED_SITE", "Diese Webseite wird derzeit nicht unterstÃ¼tzt."
+        return "UNSUPPORTED_SITE", "Diese Webseite wird derzeit nicht unterstützt."
     if any(word in text for word in ("timed out", "connection", "resolve")):
-        return "SOURCE_UNREACHABLE", "Die Videoquelle ist nicht erreichbar. Bitte spÃ¤ter erneut versuchen."
-    return "DOWNLOAD_FAILED", "Das Video konnte nicht geladen werden. Quelle prÃ¼fen oder yt-dlp aktualisieren."
+        return "SOURCE_UNREACHABLE", "Die Videoquelle ist nicht erreichbar. Bitte später erneut versuchen."
+    return "DOWNLOAD_FAILED", "Das Video konnte nicht geladen werden. Quelle prüfen oder yt-dlp aktualisieren."
 
 
 def _diagnostics() -> dict:
@@ -193,7 +193,7 @@ def _validate_video_url(url: str) -> str:
         raise HTTPException(status_code=400, detail="Bitte gib einen Video-Link ein.")
     parts = urlsplit(trimmed)
     if parts.scheme not in {"http", "https"} or not parts.netloc:
-        raise HTTPException(status_code=400, detail="Bitte gib einen gÃƒÂ¼ltigen http- oder https-Link ein.")
+        raise HTTPException(status_code=400, detail="Bitte gib einen gültigen http- oder https-Link ein.")
     return trimmed
 
 
@@ -203,7 +203,7 @@ def _invalid_video_url_response(request_id: str | None = None):
         content={
             "error": {
                 "code": "INVALID_VIDEO_URL",
-                "message": "Bitte gib einen Video-Link ins Linkfeld ein. Die Server-Adresse gehÃƒÂ¶rt in die Einstellungen.",
+                "message": "Bitte gib einen Video-Link ins Linkfeld ein. Die Server-Adresse gehört in die Einstellungen.",
                 "phase": "validation",
                 "request_id": request_id,
             }
@@ -338,7 +338,7 @@ def api_info(
         reverse=True,
     )
 
-    # FÃƒÂ¼r die Vorschau ein direkt abspielbares MP4 (Bild + Ton) bis 720p suchen
+    # Für die Vorschau ein direkt abspielbares MP4 (Bild + Ton) bis 720p suchen
     preview_url = None
     preview_height = -1
     for f in formats:
@@ -572,17 +572,17 @@ def _download_options(url: str, tmpdir: str, format_selector: str) -> dict:
         "merge_output_format": "mp4",
         "retries": 5,
         "fragment_retries": 5,
-        # Bei in HÃƒÂ¤ppchen aufgeteilten Quellen (HLS/DASH) so viele StÃƒÂ¼cke
-        # gleichzeitig laden wie sinnvoll mÃƒÂ¶glich.
+        # Bei in Häppchen aufgeteilten Quellen (HLS/DASH) so viele Stücke
+        # gleichzeitig laden wie sinnvoll möglich.
         "concurrent_fragment_downloads": 16,
         "extractor_retries": 3,
         "file_access_retries": 3,
         "socket_timeout": 30,
     })
     if _ARIA2C_PATH:
-        # FÃƒÂ¼r normale (nicht fragmentierte) Downloads nutzt aria2c mehrere
-        # parallele Verbindungen zur Quelle statt nur einer Ã¢â‚¬â€œ oft der grÃƒÂ¶ÃƒÅ¸te
-        # Geschwindigkeitsgewinn. Wird automatisch ÃƒÂ¼bersprungen, falls
+        # Für normale (nicht fragmentierte) Downloads nutzt aria2c mehrere
+        # parallele Verbindungen zur Quelle statt nur einer – oft der größte
+        # Geschwindigkeitsgewinn. Wird automatisch übersprungen, falls
         # aria2c auf diesem Server nicht installiert ist.
         opts["external_downloader"] = "aria2c"
         opts["external_downloader_args"] = {
@@ -666,8 +666,8 @@ def api_download(
     if not _ffprobe_path():
         return _missing_prerequisite_response(
             request_id,
-            "ffprobe wurde nicht gefunden. Bitte installiere ffmpeg vollstÃƒÂ¤ndig und starte den Server neu.",
-            "ffprobe ist Teil von ffmpeg und wird benÃƒÂ¶tigt, um die finale Videodatei zu prÃƒÂ¼fen.",
+            "ffprobe wurde nicht gefunden. Bitte installiere ffmpeg vollständig und starte den Server neu.",
+            "ffprobe ist Teil von ffmpeg und wird benötigt, um die finale Videodatei zu prüfen.",
         )
 
     requested_quality = quality if quality is not None else height
@@ -779,7 +779,7 @@ def api_download(
         return _download_error_response(
             request_id,
             exception_type="InvalidFinalVideo",
-            detail="Die erzeugte Datei enthÃƒÂ¤lt keinen abspielbaren iOS-kompatiblen Video-Track.",
+            detail="Die erzeugte Datei enthält keinen abspielbaren iOS-kompatiblen Video-Track.",
         )
 
     title = info.get("title") or "video"

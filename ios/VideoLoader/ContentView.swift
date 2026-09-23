@@ -6,7 +6,7 @@ struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
 
     private static let defaultLocalServerURL = ""
-    private static let invalidVideoInputMessage = "Bitte gib einen Video-Link ins Linkfeld ein. Die Server-Adresse gehÃ¶rt in die Einstellungen."
+    private static let invalidVideoInputMessage = "Bitte gib einen Video-Link ins Linkfeld ein. Die Server-Adresse gehört in die Einstellungen."
 
     @AppStorage("serverURL_videoLoader") private var macServerURL = ""
     @AppStorage("serverURL_vidSave") private var cloudServerURL = ""
@@ -56,23 +56,23 @@ struct ContentView: View {
                         GlassErrorStateView(
                             title: "Aktion fehlgeschlagen",
                             message: errorMessage,
-                            actionTitle: "Einstellungen Ã¶ffnen",
+                            actionTitle: "Einstellungen öffnen",
                             action: { showSettings = true }
                         )
                     }
 
                     if isLoadingInfo {
                         GlassLoadingStateView(
-                            title: "Video wird geprÃ¼ft",
-                            message: "Metadaten und verfÃ¼gbare QualitÃ¤ten werden geladen."
+                            title: "Video wird geprüft",
+                            message: "Metadaten und verfügbare Qualitäten werden geladen."
                         )
                     }
 
                     if let justQueuedTitle {
                         GlassStatusBanner(
                             tone: .success,
-                            title: "Zur Warteschlange hinzugefÃ¼gt",
-                            message: "â€ž\(justQueuedTitle)â€œ wird jetzt im Tab â€žDownloadsâ€œ verarbeitet."
+                            title: "Zur Warteschlange hinzugefügt",
+                            message: "„\(justQueuedTitle)“ wird jetzt im Tab „Downloads“ verarbeitet."
                         )
                     }
 
@@ -82,8 +82,8 @@ struct ContentView: View {
                         downloadButton
                     } else if !isLoadingInfo && errorMessage == nil {
                         GlassEmptyStateView(
-                            title: "Noch kein Video ausgewÃ¤hlt",
-                            message: "FÃ¼ge einen Video-Link ein, prÃ¼fe das Video und wÃ¤hle anschlieÃŸend die gewÃ¼nschte QualitÃ¤t. YouTube und weitere Quellen sind je nach Server verfÃ¼gbar.",
+                            title: "Noch kein Video ausgewählt",
+                            message: "Füge einen Video-Link ein, prüfe das Video und wähle anschließend die gewünschte Qualität. YouTube und weitere Quellen sind je nach Server verfügbar.",
                             systemImage: "play.rectangle.on.rectangle"
                         )
                     }
@@ -103,7 +103,7 @@ struct ContentView: View {
                         Image(systemName: "gearshape")
                             .foregroundStyle(AppGlassColors.textPrimary)
                     }
-                    .accessibilityLabel("Einstellungen Ã¶ffnen")
+                    .accessibilityLabel("Einstellungen öffnen")
                 }
             }
             .sheet(isPresented: $showSettings, onDismiss: { Task { await checkServer() } }) {
@@ -214,7 +214,7 @@ struct ContentView: View {
         case .some(false):
             return "Server offline"
         case .none:
-            return "PrÃ¼fenâ€¦"
+            return "Prüfen…"
         }
     }
 
@@ -223,9 +223,9 @@ struct ContentView: View {
         case .some(true):
             return activeServer == .videoLoader ? "Lokaler Server online" : "Cloud-Server online"
         case .some(false):
-            return "Server offline. Zum erneuten PrÃ¼fen doppeltippen."
+            return "Server offline. Zum erneuten Prüfen doppeltippen."
         case .none:
-            return "Serverstatus wird geprÃ¼ft"
+            return "Serverstatus wird geprüft"
         }
     }
 
@@ -235,7 +235,7 @@ struct ContentView: View {
         VStack(alignment: .leading, spacing: AppGlassSpacing.md) {
             GlassInputField(
                 label: "Video-Link",
-                placeholder: "Link hier einfÃ¼gen",
+                placeholder: "Link hier einfügen",
                 text: $videoLink,
                 keyboardType: .URL,
                 textContentType: .URL,
@@ -250,7 +250,7 @@ struct ContentView: View {
                             .foregroundStyle(AppGlassColors.textSecondary)
                     }
                     .frame(minWidth: AppGlassTheme.controlHeight, minHeight: AppGlassTheme.controlHeight)
-                    .accessibilityLabel("Link aus Zwischenablage einfÃ¼gen")
+                    .accessibilityLabel("Link aus Zwischenablage einfügen")
                 } else {
                     Button {
                         videoLink = ""
@@ -271,7 +271,7 @@ struct ContentView: View {
                     .font(AppGlassTypography.footnote)
                     .foregroundStyle(AppGlassColors.warning)
             } else if !cleanedLink.isEmpty && !Self.looksLikeWebURL(cleanedLink) {
-                Label("Bitte fÃ¼ge einen gÃ¼ltigen Video-Link ein.", systemImage: "exclamationmark.circle.fill")
+                Label("Bitte füge einen gültigen Video-Link ein.", systemImage: "exclamationmark.circle.fill")
                     .font(AppGlassTypography.footnote)
                     .foregroundStyle(AppGlassColors.warning)
             }
@@ -284,10 +284,10 @@ struct ContentView: View {
                         HStack(spacing: AppGlassSpacing.sm) {
                             ProgressView()
                                 .tint(.white)
-                            Text("Video wird geprÃ¼ftâ€¦")
+                            Text("Video wird geprüft…")
                         }
                     } else {
-                        Label("PrÃ¼fen", systemImage: "magnifyingglass")
+                        Label("Prüfen", systemImage: "magnifyingglass")
                     }
                 }
                 .buttonStyle(GlassPrimaryButtonStyle())
@@ -297,7 +297,7 @@ struct ContentView: View {
                     Button {
                         pasteFromClipboard()
                     } label: {
-                        Label("EinfÃ¼gen", systemImage: "doc.on.clipboard")
+                        Label("Einfügen", systemImage: "doc.on.clipboard")
                     }
                     .buttonStyle(GlassSecondaryButtonStyle())
                 }
@@ -358,17 +358,17 @@ struct ContentView: View {
         }
     }
 
-    // MARK: - QualitÃ¤t
+    // MARK: - Qualität
 
     private func qualitySection(_ info: VideoInfo) -> some View {
         VStack(alignment: .leading, spacing: AppGlassSpacing.md) {
-            AppGlassSectionHeader(title: "QualitÃ¤t")
+            AppGlassSectionHeader(title: "Qualität")
 
             if info.qualities.isEmpty {
                 GlassStatusBanner(
                     tone: .warning,
-                    title: "Keine QualitÃ¤tsliste verfÃ¼gbar",
-                    message: "Die App verwendet beim Download die beste QualitÃ¤t, die der aktive Server bereitstellt."
+                    title: "Keine Qualitätsliste verfügbar",
+                    message: "Die App verwendet beim Download die beste Qualität, die der aktive Server bereitstellt."
                 )
             } else {
                 Button {
@@ -376,7 +376,7 @@ struct ContentView: View {
                 } label: {
                     HStack(spacing: AppGlassSpacing.md) {
                         VStack(alignment: .leading, spacing: AppGlassSpacing.xs) {
-                            Text("QualitÃ¤t auswÃ¤hlen")
+                            Text("Qualität auswählen")
                                 .font(AppGlassTypography.headline)
                                 .foregroundStyle(AppGlassColors.textPrimary)
                             Text(selectedQualitySummary)
@@ -399,16 +399,16 @@ struct ContentView: View {
                     )
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("QualitÃ¤t auswÃ¤hlen")
+                .accessibilityLabel("Qualität auswählen")
 
                 if info.hasLimitedQualities {
                     GlassStatusBanner(
                         tone: .warning,
-                        title: "Nur begrenzte QualitÃ¤t verfÃ¼gbar",
-                        message: "Der aktuelle Server liefert fÃ¼r dieses Video keine hÃ¶heren QualitÃ¤tsoptionen."
+                        title: "Nur begrenzte Qualität verfügbar",
+                        message: "Der aktuelle Server liefert für dieses Video keine höheren Qualitätsoptionen."
                     )
                 } else if selectedQuality?.isAutomatic == true {
-                    Text("Automatisch lÃ¤dt die beste verfÃ¼gbare QualitÃ¤t des aktiven Servers.")
+                    Text("Automatisch lädt die beste verfügbare Qualität des aktiven Servers.")
                         .font(AppGlassTypography.footnote)
                         .foregroundStyle(AppGlassColors.textSecondary)
                 }
@@ -417,12 +417,12 @@ struct ContentView: View {
     }
 
     private var selectedQualitySummary: String {
-        guard let selectedQuality else { return "Beste verfÃ¼gbare QualitÃ¤t" }
+        guard let selectedQuality else { return "Beste verfügbare Qualität" }
         if selectedQuality.isAutomatic {
-            return "Automatisch Â· beste verfÃ¼gbare QualitÃ¤t"
+            return "Automatisch · beste verfügbare Qualität"
         }
         let detail = selectedQuality.detailText
-        return detail.isEmpty ? selectedQuality.label : "\(selectedQuality.label) Â· \(detail)"
+        return detail.isEmpty ? selectedQuality.label : "\(selectedQuality.label) · \(detail)"
     }
 
     // MARK: - Download
@@ -451,7 +451,7 @@ struct ContentView: View {
         } else {
             ZStack {
                 AppGlassBackground()
-                Text("FÃ¼r dieses Video ist keine Vorschau verfÃ¼gbar.")
+                Text("Für dieses Video ist keine Vorschau verfügbar.")
                     .font(AppGlassTypography.body)
                     .foregroundStyle(AppGlassColors.textSecondary)
                     .padding()
@@ -464,12 +464,12 @@ struct ContentView: View {
     private func pasteFromClipboard() {
         guard let pasted = UIPasteboard.general.string?.trimmingCharacters(in: .whitespacesAndNewlines),
               !pasted.isEmpty else {
-            linkValidationMessage = "Die Zwischenablage enthÃ¤lt keinen Link."
+            linkValidationMessage = "Die Zwischenablage enthält keinen Link."
             clipboardHasLink = false
             return
         }
         guard Self.looksLikeWebURL(pasted) else {
-            linkValidationMessage = "Die Zwischenablage enthÃ¤lt keinen gÃ¼ltigen Video-Link."
+            linkValidationMessage = "Die Zwischenablage enthält keinen gültigen Video-Link."
             clipboardHasLink = false
             return
         }
@@ -527,7 +527,7 @@ struct ContentView: View {
         } catch let error as APIError {
             errorMessage = error.errorDescription
         } catch {
-            errorMessage = "Das Video konnte nicht geprÃ¼ft werden: \(error.localizedDescription)"
+            errorMessage = "Das Video konnte nicht geprüft werden: \(error.localizedDescription)"
         }
     }
 
@@ -561,7 +561,7 @@ struct ContentView: View {
 
     private func validateVideoInput() -> Bool {
         guard !cleanedLink.isEmpty, Self.looksLikeWebURL(cleanedLink) else {
-            linkValidationMessage = "Bitte fÃ¼ge einen gÃ¼ltigen Video-Link ein."
+            linkValidationMessage = "Bitte füge einen gültigen Video-Link ein."
             return false
         }
         let lowercased = cleanedLink.lowercased()
@@ -639,7 +639,7 @@ struct ContentView: View {
     }
 }
 
-// MARK: - QualitÃ¤tssheet
+// MARK: - Qualitätssheet
 
 private struct QualityPickerSheet: View {
     let info: VideoInfo
@@ -682,8 +682,8 @@ private struct QualityPickerSheet: View {
                     if info.hasLimitedQualities {
                         GlassStatusBanner(
                             tone: .warning,
-                            title: "Nur begrenzte QualitÃ¤t verfÃ¼gbar",
-                            message: "Der aktuelle Server liefert fÃ¼r dieses Video keine hÃ¶heren QualitÃ¤tsoptionen."
+                            title: "Nur begrenzte Qualität verfügbar",
+                            message: "Der aktuelle Server liefert für dieses Video keine höheren Qualitätsoptionen."
                         )
                     }
 
@@ -691,7 +691,7 @@ private struct QualityPickerSheet: View {
                         GlassStatusBanner(
                             tone: .neutral,
                             title: "Automatisch",
-                            message: "Die App lÃ¤dt automatisch die beste verfÃ¼gbare QualitÃ¤t."
+                            message: "Die App lädt automatisch die beste verfügbare Qualität."
                         )
                     }
                 }
@@ -699,7 +699,7 @@ private struct QualityPickerSheet: View {
                 .padding(.bottom, AppGlassSpacing.xl)
             }
             .background(AppGlassBackground())
-            .navigationTitle("QualitÃ¤t auswÃ¤hlen")
+            .navigationTitle("Qualität auswählen")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -732,7 +732,7 @@ private struct QualityPickerSheet: View {
                     Text(option.label)
                         .font(AppGlassTypography.headline)
                         .foregroundStyle(AppGlassColors.textPrimary)
-                    Text(option.isAutomatic ? "Beste verfÃ¼gbare QualitÃ¤t" : option.detailText)
+                    Text(option.isAutomatic ? "Beste verfügbare Qualität" : option.detailText)
                         .font(AppGlassTypography.footnote)
                         .foregroundStyle(AppGlassColors.textSecondary)
                 }
@@ -758,7 +758,7 @@ private struct QualityPickerSheet: View {
             )
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(option.label), \(option.isAutomatic ? "automatisch beste QualitÃ¤t" : option.detailText)")
+        .accessibilityLabel("\(option.label), \(option.isAutomatic ? "automatisch beste Qualität" : option.detailText)")
     }
 }
 
