@@ -35,7 +35,7 @@ TODAY="$(date +%Y-%m-%d)"
 LAST_YTDLP_UPDATE="$(cat "$YTDLP_STAMP" 2>/dev/null || true)"
 if [ "$TODAY" != "$LAST_YTDLP_UPDATE" ]; then
   echo "Prüfe yt-dlp-Update ..."
-  ./.venv/bin/pip install --upgrade --quiet yt-dlp
+  ./.venv/bin/pip install --upgrade --quiet "yt-dlp[default]"
   echo "$TODAY" > "$YTDLP_STAMP"
 fi
 
@@ -50,7 +50,7 @@ fi
 
 echo ""
 echo "Server startet. Diese Adresse in der App eintragen:"
-IP=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null)
+IP=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || true)
 PORT="${PORT:-9876}"
 echo "  http://${IP:-<Mac-IP-Adresse>}:$PORT"
 echo ""

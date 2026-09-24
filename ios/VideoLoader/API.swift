@@ -24,7 +24,7 @@ struct ServerAPI {
     let kind: ServerKind
     let baseURL: String
 
-    private static let videoURLInServerFieldMessage = "Bitte gib einen YouTube-Link ins Linkfeld ein. Die Server-Adresse gehört in die Einstellungen."
+    private static let videoURLInServerFieldMessage = "Bitte gib einen Video-Link ins Linkfeld ein. Die Server-Adresse gehört in die Einstellungen."
 
     private static let session: URLSession = {
         let config = URLSessionConfiguration.default
@@ -40,7 +40,11 @@ struct ServerAPI {
         if !trimmed.lowercased().hasPrefix("http") {
             trimmed = "http://" + trimmed
         }
-        guard let components = URLComponents(string: trimmed) else { throw APIError.badURL }
+        guard let components = URLComponents(string: trimmed),
+              let host = components.host, !host.isEmpty,
+              ["http", "https"].contains(components.scheme?.lowercased() ?? ""),
+              components.user == nil, components.password == nil,
+              components.query == nil, components.fragment == nil else { throw APIError.badURL }
         if Self.containsServerAPIPath(components.path) || Self.looksLikeKnownVideoPage(trimmed) {
             throw APIError.server(Self.videoURLInServerFieldMessage)
         }
@@ -159,25 +163,41 @@ struct ServerAPI {
 
     // MARK: - Erreichbarkeit (für die Server-Ampel)
 
-    /// Prüft mit kurzem Zeitlimit, ob der Server antwortet. Jede HTTP-Antwort
-    /// (auch 404) zählt als erreichbar – nur ein Verbindungsfehler ist „offline“.
+    /// Prüft HTTP-Status und die Bereitschaft des passenden Servers.
     func isReachable() async -> Bool {
-        var components: URLComponents
-        do { components = try normalizedBase() } catch { return false }
-        components.path = kind == .videoLoader ? "/api/health" : "/health"
-        guard let healthURL = components.url else { return false }
+        do { _ = try await checkConnection(); return true } catch { return false }
+    }
 
+    /// Gibt Hinweise zurück, wenn nur bestimmte Quellen eingeschränkt sind.
+    func checkConnection() async throws -> String? {
+        var components = try normalizedBase()
+        components.path = kind == .videoLoader ? "/api/health" : "/health"
+        guard let healthURL = components.url else { throw APIError.badURL }
         var request = URLRequest(url: healthURL)
         request.timeoutInterval = 6
-        let config = URLSessionConfiguration.ephemeral
-        config.timeoutIntervalForRequest = 6
-        let session = URLSession(configuration: config)
-        do {
-            let (_, response) = try await session.data(for: request)
-            return response is HTTPURLResponse
-        } catch {
-            return false
+        let session = URLSession(configuration: .ephemeral)
+        defer { session.invalidateAndCancel() }
+        let (data, response): (Data, URLResponse)
+        do { (data, response) = try await session.data(for: request) }
+        catch { throw APIError.unreachable }
+        guard let http = response as? HTTPURLResponse,
+              (200...299).contains(http.statusCode) else {
+            throw APIError.server("An dieser Adresse antwortet kein passender Server. Adresse und Port prüfen.")
         }
+        if kind == .videoLoader {
+            guard let health = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  health["server_name"] as? String == "VideoLoader local server" else {
+                throw APIError.server("Dies ist kein VideoLoader-Server. Bitte die Adresse aus start.ps1 eintragen.")
+            }
+            guard health["status"] as? String == "ok" else {
+                throw APIError.server("Server erreichbar, aber nicht bereit. ffmpeg, ffprobe und freien PC-Speicher mit start.ps1 -CheckOnly prüfen.")
+            }
+            if let runtime = health["javascript_runtime"] as? [String: Any],
+               runtime["available"] as? Bool == false {
+                return "Für YouTube fehlt Deno ab Version 2.3 auf dem PC. Andere Quellen können funktionieren."
+            }
+        }
+        return nil
     }
 
     // MARK: - Hilfen

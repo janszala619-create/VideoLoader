@@ -1,121 +1,92 @@
-# VideoLoader – private Video-Download-App fürs iPhone
+# VideoLoader – iPhone-App mit Windows-Server
 
-Die App besteht aus zwei Teilen:
+Link einfügen → Video prüfen → Qualität wählen → herunterladen → offline ansehen.
+Die SwiftUI-App benötigt iOS 17 oder neuer. Der private Hilfsdienst läuft auf deinem Windows-PC im selben WLAN. GitHub Actions baut die IPA auf macOS; ein eigener Mac ist dafür nicht erforderlich.
 
-| Teil | Ordner | Aufgabe |
-|---|---|---|
-| Server | `server/` | Läuft auf deinem Mac. Holt die Videos mit yt-dlp von YouTube & über 1.000 anderen Plattformen. |
-| iPhone-App | `ios/` | Link einfügen → Vorschau ansehen → Qualität wählen → Download → Video landet im Tab „Meine Videos“ und kann von dort angesehen, geteilt oder in die Fotos-Galerie gesichert werden. |
+## 1. Windows einmalig vorbereiten
 
-### Zwei Server – oben in der App umschaltbar
-
-Die App kann zwei verschiedene Server ansprechen; oben wählst du per Schalter aus:
-
-- **Lokaler Server** (Standard, z. B. `http://100.80.105.62:9876`): läuft bei dir zu Hause und wird von YouTube **nicht** blockiert – die zuverlässige Wahl, besonders für YouTube.
-- **Cloud-Server / VidSave** (Legacy, Adresse `http://158.101.168.11:8765`): überall erreichbar, aber YouTube, Vimeo und viele große Seiten blockieren diesen Server häufig.
-
-> **Wichtig:** Nur für den privaten Gebrauch. Lade nur Videos herunter, zu deren Download du berechtigt bist. Solche Apps sind im App Store nicht erlaubt – die Installation erfolgt direkt über Xcode auf dein eigenes iPhone.
-
----
-
-## Schritt 1: Projekt auf den Mac übertragen
-
-Kopiere den kompletten Ordner `VideoLoader` auf deinen Mac (z. B. per USB-Stick, iCloud, oder als ZIP per E-Mail an dich selbst).
-
-## Schritt 2: Server lokal starten
-
-1. **ffmpeg installieren** (einmalig, wird zum Zusammenfügen von Bild und Ton gebraucht).
-   Auf macOS in der **Terminal**-App:
-   ```bash
-   brew install ffmpeg
-   ```
-   Falls `brew` nicht gefunden wird, installiere zuerst Homebrew von https://brew.sh.
-
-   Auf Windows in **PowerShell**:
-   ```powershell
-   winget install Gyan.FFmpeg
-   ```
-   Öffne danach PowerShell neu, damit `ffmpeg` im PATH gefunden wird.
-
-2. **Server starten.**
-
-   macOS/Linux:
-   ```bash
-   cd /Pfad/zum/VideoLoader/server
-   VIDEOLOADER_LOG_LEVEL=DEBUG python -m uvicorn main:app --host 0.0.0.0 --port 9876 --log-level debug
-   ```
-
-   Windows PowerShell:
-   ```powershell
-   cd C:\Pfad\zum\VideoLoader\server
-   $env:VIDEOLOADER_LOG_LEVEL="DEBUG"
-   python -m uvicorn main:app --host 0.0.0.0 --port 9876 --log-level debug
-   ```
-
-   Beim ersten Start richtet das Skript alles automatisch ein. Danach zeigt es dir die Adresse an, z. B.:
-   ```
-   Server startet. Diese Adresse in der App eintragen:
-     http://100.80.105.62:9876
-   ```
-   **Diese Adresse brauchst du gleich in der App.** Lass das Terminal-Fenster offen, solange du die App benutzt.
-
-3. **Server prüfen.** Öffne im Browser:
-   ```text
-   http://100.80.105.62:9876/api/health
-   ```
-   Für eine ausführlichere Diagnose:
-   ```text
-   http://100.80.105.62:9876/api/diagnostics
-   ```
-   Dort siehst du, ob der Download-Ordner beschreibbar ist und ob `ffmpeg`, `ffprobe` und `yt-dlp` gefunden werden.
-
-## Schritt 3: App auf das iPhone installieren
-
-1. Öffne `ios/VideoLoader.xcodeproj` mit **Xcode** (Version 16 oder neuer, kostenlos im Mac App Store).
-2. Klicke links oben im Dateibaum auf **VideoLoader** (das Projekt) → Tab **Signing & Capabilities**:
-   - Setze bei **Team** deine Apple-ID (über „Add an Account…“ hinzufügen – ein normaler, kostenloser Apple-Account reicht).
-   - Ändere die **Bundle Identifier** in etwas Eigenes, z. B. `de.deinname.VideoLoader`.
-3. Schließe dein iPhone per Kabel an und wähle es oben in der Geräteliste aus.
-4. Drücke **▶ (Run)**. Beim ersten Mal:
-   - Am iPhone unter **Einstellungen → Allgemein → VPN & Geräteverwaltung** deinem Entwicklerprofil vertrauen.
-   - Ggf. den **Entwicklermodus** aktivieren (Einstellungen → Datenschutz & Sicherheit → Entwicklermodus).
-
-> Mit einem kostenlosen Apple-Account läuft die App 7 Tage, dann einfach erneut über Xcode installieren (▶ drücken genügt). Mit einem bezahlten Entwickler-Account (99 €/Jahr) hält die Installation 1 Jahr.
-
-## Schritt 4: App benutzen
-
-1. Beim ersten Start öffnen sich die **Einstellungen**: Trage dort die Server-Adresse aus Schritt 2 ein (z. B. `http://100.80.105.62:9876`). iPhone und Computer müssen im selben WLAN oder Tailscale-Netz sein.
-2. Video-Link kopieren (z. B. über „Teilen → Kopieren“ in der YouTube-App), in der App einfügen und **„Video prüfen“** tippen.
-3. Vorschau ansehen (▶ auf dem Vorschaubild), **Qualität wählen** und **„Herunterladen“** tippen.
-4. Das Video erscheint im Tab **„Meine Videos“**: Antippen zum Abspielen, Teilen-Symbol zum Weitergeben, Foto-Symbol zum Sichern in die **Fotos-Galerie** (beim ersten Mal fragt iOS nach Erlaubnis – erlauben). Wischen nach links löscht ein Video.
-
----
-
-## Häufige Probleme
-
-- **„Server nicht erreichbar“** – Läuft der lokale Server noch? Sind iPhone und Computer im selben WLAN oder Tailscale-Netz? Stimmt die Adresse (inkl. `:9876`)?
-- **„ffmpeg wurde nicht gefunden“** – Installiere `ffmpeg` wie oben beschrieben und starte danach Terminal/PowerShell und den Server neu.
-- **YouTube-Video schlägt fehl** – yt-dlp muss aktuell sein. Einfach den Server neu starten (`./start.sh` aktualisiert yt-dlp automatisch).
-- **Unterwegs nutzen (nicht im Heim-WLAN)** – Installiere [Tailscale](https://tailscale.com) (kostenlos) auf Computer und iPhone; trage dann in der App die Tailscale-Adresse des Computers ein (z. B. `http://100.x.y.z:9876`).
-- **Server in der Cloud statt auf dem Mac?** – Möglich (der `server/`-Ordner läuft überall, wo Python + ffmpeg vorhanden sind), aber Achtung: YouTube blockiert Rechenzentrums-IP-Adressen häufig. Der Server zu Hause auf dem Mac ist am zuverlässigsten.
-
-### Diagnose: richtiger Server und Ports
-
-Der lokale VideoLoader-Server meldet sich unter:
-
-```text
-http://TAILSCALE_IP:9876/api/health
-```
-
-Die Antwort muss `server_name: "VideoLoader local server"` enthalten. Verwende in der App nur die Basisadresse `http://TAILSCALE_IP:9876`, nicht `/api/health`, nicht `localhost`, nicht `127.0.0.1` und keinen YouTube-Link.
-
-Falls noch ein alter VidSave-Prozess auf Port 8765 läuft:
+In PowerShell installieren:
 
 ```powershell
-netstat -ano | findstr :8765
-netstat -ano | findstr :9876
-Get-Process -Id <PID>
-Stop-Process -Id <PID> -Force
+winget install Python.Python.3.12
+winget install Gyan.FFmpeg
+winget install DenoLand.Deno
 ```
 
-Korrekte Server-Logs enthalten `VideoLoader /api/info`, `VideoLoader /api/download`, `quality=` und `ffprobe`. Wenn Logs `vidsave.server`, `info_requested` oder `download_requested` zeigen, trifft die App noch den alten VidSave-Server oder den falschen Port.
+Danach PowerShell neu öffnen. Python 3.10 oder neuer, ffmpeg samt ffprobe und Deno ab 2.3 werden benötigt. Die Python-Abhängigkeit `yt-dlp[default]` enthält die passenden YouTube-Challenge-Skripte; das Startskript installiert sie in einer eigenen Umgebung.
+
+## 2. Server starten
+
+Repository herunterladen oder klonen. Im Projektordner:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\server\start.ps1
+```
+
+Die Ausführungsrichtlinie gilt nur für diesen Prozess. Das Skript stoppt bei fehlgeschlagenen Installationen, prüft die Werkzeuge und zeigt die aktiven Netzwerkadressen an. Wähle die WLAN/LAN-Adresse deines PCs, beispielsweise `http://192.168.1.10:9876`. Dies ist nur ein Beispiel, keine voreingestellte Adresse.
+
+Python in der Windows-Firewall ausschließlich für das private Netzwerk zulassen. Kein Port-Forwarding einrichten: Der Dienst ist für dein privates WLAN bestimmt und hat keine Benutzeranmeldung. PC und Terminal müssen während der Downloads eingeschaltet bleiben; Energiesparmodus unterbricht die Verbindung.
+
+Prüfung ohne Installation oder Serverstart:
+
+```powershell
+.\server\start.ps1 -CheckOnly
+```
+
+Downloader bei Plattformänderungen aktualisieren:
+
+```powershell
+.\server\start.ps1 -UpdateDownloader
+```
+
+Standard-Port ist **9876**, optional mit der Umgebungsvariable `PORT` überschreibbar. Bei mehreren angezeigten Adressen diejenige des gemeinsamen iPhone-WLANs verwenden. Im iPhone-Browser `http://DEINE-PC-IP:9876/api/health` testen. `/api/diagnostics` zeigt fehlende Werkzeuge und den beschreibbaren Ausgabeordner an. Nach Installation neuer Werkzeuge den Server neu starten.
+
+## 3. IPA mit GitHub bauen
+
+Änderungen in dein Repository übertragen. Unter **Actions → Build → Run workflow** starten. Derselbe Workflow läuft auch bei Push und Pull Requests.
+
+- Servertests laufen unter Windows und Linux.
+- Ein macOS-Runner prüft den Simulator-Build und baut anschließend die iPhone-App in Release-Konfiguration.
+- Im erfolgreichen Lauf unter **Artifacts → VideoLoader-unsigned-ipa** die ZIP herunterladen und entpacken.
+- Das Ergebnis heißt `VideoLoader-unsigned.ipa`. Es ist noch nicht signiert und lässt sich nicht durch bloßes Antippen installieren.
+- Build-Protokolle stehen auch nach fehlgeschlagenen Builds als Artefakt bereit.
+
+## 4. Auf dem iPhone installieren
+
+[AltStore Classic für Windows installieren](https://faq.altstore.io/altstore-classic/how-to-install-altstore-windows). Dabei die dort genannten Apple-Komponenten installieren, das iPhone mit dem PC verbinden und AltServer mit deiner Apple-ID einrichten. Apple-Zugangsdaten gehören weder in das Repository noch in GitHub Secrets.
+
+Die heruntergeladene IPA auf dem iPhone in Dateien bereitstellen und in AltStore Classic unter **My Apps → +** auswählen. AltStore signiert die App. Falls iOS es verlangt, dem Entwicklerprofil vertrauen und den Entwicklermodus aktivieren.
+
+Mit kostenloser Apple-ID laufen Apps gewöhnlich nach **sieben Tagen** ab; regelmäßig mit erreichbarem AltServer erneuern. Kostenloses Sideloading begrenzt außerdem aktive Apps und App-IDs. VideoLoader enthält eine Share Extension, die eine weitere App-ID beanspruchen kann. Bei Updates dieselbe Apple-ID und App-Identität verwenden und die App nicht deinstallieren, damit lokale Videos erhalten bleiben.
+
+## 5. Benutzen
+
+1. VideoLoader öffnen, unter Einstellungen die vom PC angezeigte Adresse eingeben und **Verbindung testen** wählen. Den Zugriff auf das lokale Netzwerk erlauben.
+2. Öffentlichen Einzelvideo-Link einfügen und prüfen.
+3. Standard ist **Automatisch**; andere angebotene Auflösungen lassen sich auswählen.
+4. Herunterladen: Zunächst bereitet der PC die Datei vor, anschließend zeigt die App den Übertragungsfortschritt, sofern die Größe bekannt ist.
+5. In der Bibliothek offline abspielen, nach Dateien teilen oder in Fotos sichern. Fotozugriff wird erst beim Export angefragt.
+
+Öffentliche YouTube-, Instagram- und TikTok-Videos sowie viele eingebettete Player, direkte Videodateien und ungeschützte HLS-Streams werden über yt-dlp verarbeitet. Unterstützung hängt von Quelle und Plattform ab; Login-, Regions- und Bot-Sperren können Downloads verhindern. Keine Website-Anmeldung, Playlist-Verarbeitung, Livestream-Aufzeichnung oder DRM-Entschlüsselung vorgesehen. Nur Videos laden, zu deren Download du berechtigt bist.
+
+Vorhandene eigene Server-Adressen, Qualitätspräferenzen und Videos bleiben erhalten. Alte mitgelieferte Beispieladressen werden einmalig entfernt. Der optionale Legacy-VidSave-Modus bleibt für bestehende eigene Einstellungen verfügbar; es gibt keinen voreingestellten Cloud-Server und keinen automatischen Wechsel dorthin.
+
+## Fehler beheben
+
+- **Server nicht erreichbar:** PC eingeschaltet, richtiger Port, gleiche WLAN-Verbindung, privates Firewall-Profil und iOS-Lokalnetzfreigabe prüfen. Gastnetze können Geräte voneinander isolieren.
+- **Server nicht bereit:** `start.ps1 -CheckOnly` ausführen; ffmpeg/ffprobe und PC-Speicher prüfen.
+- **YouTube funktioniert nicht:** Deno prüfen, Downloader aktualisieren. Manche Videos benötigen eine Anmeldung oder werden von der Plattform blockiert.
+- **Abbruch bei gesperrtem Bildschirm:** Die App verwendet iOS-Hintergrunddownloads. iOS entscheidet über deren Ausführung; erzwungenes Beenden stoppt sie. App erneut öffnen und gegebenenfalls wiederholen.
+- **Speicher voll:** Auf PC oder iPhone Platz schaffen. Fertige Server-Dateien liegen unter `server/downloads` und können nach Abschluss des Transfers manuell gelöscht werden.
+- **Fotos verweigert:** In den iOS-Einstellungen den Fotozugriff erlauben oder stattdessen nach Dateien exportieren.
+
+## Entwicklung und Tests
+
+```powershell
+.\server\.venv\Scripts\python.exe -m pip install httpx
+.\server\.venv\Scripts\python.exe -m unittest discover -s tests
+```
+
+Die bestehenden GET-Endpunkte bleiben erhalten: `/api/info?url=…`, `/api/download?url=…&quality=720`, `/api/health`, `/api/diagnostics`. Fehler liefern `error.code` und `error.message`; Gesundheitsantworten enthalten zusätzlich `javascript_runtime`. Fehlendes Deno wird separat gemeldet und blockiert andere Quellen nicht, wenn der Dienst direkt gestartet wird.
+
+Prüfergebnisse und noch ausstehende Gerätetests: [VALIDATION.md](VALIDATION.md).
