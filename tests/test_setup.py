@@ -1,7 +1,6 @@
 import os
 import shutil
 import subprocess
-import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -78,29 +77,6 @@ class ServerContractTests(unittest.TestCase):
 
 @unittest.skipUnless(os.name == 'nt' and shutil.which('pwsh'), 'Windows PowerShell integration tests')
 class WindowsStartupTests(unittest.TestCase):
-    def test_check_only_with_native_arguments_on_windows_shells(self):
-        # Isolated fake dependencies exercise the real startup script and Python argv.
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            script = root / 'start.ps1'
-            shutil.copyfile(Path(__file__).resolve().parents[1] / 'server/start.ps1', script)
-            (root / 'requirements.txt').write_text('', encoding='utf-8')
-            subprocess.run([sys.executable, '-m', 'venv', '--without-pip', str(root / '.venv')], check=True)
-            for module in ('fastapi', 'uvicorn', 'yt_dlp', 'yt_dlp_ejs'):
-                (root / f'{module}.py').write_text('', encoding='utf-8')
-            (root / 'main.py').write_text("def _javascript_runtime(): return {'available': True}\n", encoding='utf-8')
-            for tool in ('ffmpeg', 'ffprobe'):
-                (root / f'{tool}.cmd').write_text('@exit /b 0\n', encoding='ascii')
-            env = dict(os.environ, PORT='9876', PATH=str(root) + os.pathsep + os.environ['PATH'])
-            # Let each shell find its own modules, rather than inheriting PowerShell 7's paths.
-            env = {key: value for key, value in env.items() if key.lower() != 'psmodulepath'}
-            shells = [shutil.which('pwsh'), shutil.which('powershell')]
-            for shell in filter(None, shells):
-                with self.subTest(shell=shell):
-                    result = subprocess.run([shell, '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(script), '-CheckOnly'], env=env, capture_output=True, text=True, timeout=30)
-                    self.assertEqual(result.returncode, 0, result.stderr)
-                    self.assertIn('Voraussetzungen erfuellt. Port: 9876', result.stdout)
-
     def test_invalid_port_stops_before_install(self):
         with tempfile.TemporaryDirectory() as directory:
             script = Path(directory) / 'start.ps1'

@@ -25,7 +25,7 @@ if (-not (Test-Path -LiteralPath $python)) {
         $prefix = @()
     }
     if (-not $launcher) { throw 'Python fehlt. Installieren: winget install Python.Python.3.12' }
-    Invoke-Checked $launcher.Source ($prefix + @('-c', "import sys; assert sys.version_info >= (3, 10), 'Python 3.10 oder neuer erforderlich'"))
+    Invoke-Checked $launcher.Source ($prefix + @('-c', 'import sys; assert sys.version_info >= (3, 10), "Python 3.10 oder neuer erforderlich"'))
     if ($CheckOnly) { throw 'Virtuelle Umgebung fehlt. Zum Einrichten start.ps1 ohne -CheckOnly starten.' }
     Invoke-Checked $launcher.Source ($prefix + @('-m', 'venv', '.venv'))
 }
@@ -47,7 +47,7 @@ foreach ($tool in @('ffmpeg', 'ffprobe')) {
     if (-not $command) { throw "$tool fehlt. Installieren: winget install Gyan.FFmpeg; danach PowerShell neu oeffnen." }
     Invoke-Checked $command.Source @('-version')
 }
-Invoke-Checked $python @('-c', "from main import _javascript_runtime; r = _javascript_runtime(); print(r); assert r['available'], 'Deno >= 2.3 fehlt: winget install DenoLand.Deno'")
+Invoke-Checked $python @('-c', 'from main import _javascript_runtime; r = _javascript_runtime(); print(r); assert r["available"], "Deno >= 2.3 fehlt: winget install DenoLand.Deno"')
 if ($CheckOnly) { Write-Host "Voraussetzungen erfuellt. Port: $port"; exit 0 }
 
 $addresses = @(Get-NetIPConfiguration | Where-Object { $_.NetAdapter.Status -eq 'Up' -and $_.IPv4DefaultGateway } | ForEach-Object { $_.IPv4Address.IPAddress })

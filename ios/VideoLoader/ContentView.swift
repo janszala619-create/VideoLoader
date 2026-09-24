@@ -1,3 +1,8 @@
+-encodedCommand
+dAByAGUAZQA=
+fatal: ambiguous argument 'dAByAGUAZQA=': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
 import SwiftUI
 import AVKit
 
@@ -765,10 +770,10 @@ private struct QualityPickerSheet: View {
 private extension VideoInfo {
     var hasLimitedQualities: Bool {
         let realHeights = qualities.compactMap(\.height)
-        if realHeights.isEmpty {
-            return qualities.contains(where: { $0.isAutomatic }) || qualities.count <= 1
-        }
-        return realHeights.allSatisfy { $0 <= 360 }
+        // Einige Quellen, besonders HLS-Streams, liefern keine zuverlässigen
+        // Auflösungsmetadaten. In diesem Fall lädt „Automatisch“ trotzdem die
+        // beste verfügbare Qualität; die Warnung wäre daher irreführend.
+        return !realHeights.isEmpty && realHeights.allSatisfy { $0 <= 360 }
     }
 }
 

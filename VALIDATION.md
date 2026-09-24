@@ -9,7 +9,6 @@ Stand: 23. September 2026. Lokale Prüfung unter Windows; keine allgemeine Platt
 - Windows-Start mit tatsächlicher Installation einer neuen virtuellen Umgebung, ffmpeg/ffprobe 9.0.2, Deno 2.9.7 und yt-dlp 2026.8.19 erfolgreich auf Port 9876 ausgeführt.
 - Fehlender Python-Interpreter (Windows-Store-Platzhalter, Exit 9009) stoppt das Skript, statt eine erfolgreiche Installation vorzutäuschen.
 - Zusätzlich echte Konvertierung einer lokal erzeugten VP9/Opus-Datei zu H.264/yuv420p mit AAC durchgeführt und mit ffprobe geprüft.
-- Startprüfung sowohl mit PowerShell 7 als auch Windows PowerShell 5.1 durchgeführt; native Python-Argumente sind mit beiden kompatibel.
 
 ## Echte HTTP-Downloads
 
@@ -34,4 +33,4 @@ Instagram und direkte MP4 hatten zunächst fehlende Auflösungsmetadaten. Der da
 - Download bei gesperrtem Bildschirm sowie Wiederöffnung nach erzwungenem Beenden.
 - Offline-Wiedergabe, Export in Dateien und Fotos, verweigerte Foto-Berechtigung, voller iPhone-Speicher.
 
-Diese Gerätetests wurden hier nicht durchgeführt. GitHub Actions hat den Simulator- und iPhone-Release-Build der iOS-Quellen in Commit `93de85c` erfolgreich abgeschlossen und die unsignierte IPA bereitgestellt (Lauf `35924681255`). Die anschließende PowerShell-5.1-Korrektur ändert keine iOS-Quelldateien. Lokal bestehen 32 Tests. TikTok ist als nicht erfolgreich verifiziert dokumentiert und bleibt abhängig von erreichbaren öffentlichen Quellen.
+Diese Gerätetests wurden hier nicht durchgeführt. Der lokale Windows-Rechner enthält kein Xcode; der iOS-Build muss über den GitHub-Workflow geprüft werden. TikTok ist als nicht erfolgreich verifiziert dokumentiert und bleibt abhängig von erreichbaren öffentlichen Quellen.
