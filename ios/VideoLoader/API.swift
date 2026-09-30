@@ -85,6 +85,16 @@ struct ServerAPI {
                 .map {
                     QualityOption(id: "h\($0)", label: "\($0)p", height: $0, formatId: nil)
                 }
+
+            // Manche HLS- und eingebettete Player liefern yt-dlp keine
+            // Auflösungsmetadaten, obwohl sie mehrere Varianten anbieten.
+            // Die Auswahl bleibt dann als Obergrenze nutzbar; unbekannte
+            // Formate fallen serverseitig auf die beste verfügbare Variante zurück.
+            if qualities.isEmpty {
+                qualities = [1080, 720, 480, 360].map {
+                    QualityOption(id: "h\($0)", label: "\($0)p", height: $0, formatId: nil)
+                }
+            }
             qualities.append(QualityOption(id: "auto", label: "Automatisch", height: nil, formatId: nil))
 
             return VideoInfo(
