@@ -50,7 +50,7 @@ final class DownloadQueue: NSObject, ObservableObject {
         let config = URLSessionConfiguration.background(withIdentifier: Self.sessionIdentifier)
         config.sessionSendsLaunchEvents = true      // App bei Fertigstellung aufwecken
         config.isDiscretionary = false              // sofort starten, nicht auf WLAN/Strom warten
-        config.timeoutIntervalForRequest = 900      // dem Server Zeit geben, das Video vorzubereiten
+        config.timeoutIntervalForRequest = 3600     // einschließlich Video-Konvertierung auf dem PC
         config.timeoutIntervalForResource = 7 * 24 * 3600
         return URLSession(configuration: config, delegate: self, delegateQueue: nil)
     }()
@@ -310,7 +310,11 @@ extension DownloadQueue: URLSessionDownloadDelegate {
             }
             handleFinished(id: id, success: true, message: nil)
         } catch {
-            handleError(id: id, message: "Die Videodatei konnte nicht gespeichert werden: \(error.localizedDescription)")
+            let nsError = error as NSError
+            let message = nsError.domain == NSCocoaErrorDomain && nsError.code == NSFileWriteOutOfSpaceError
+                ? "Auf dem iPhone ist nicht genügend Speicher frei. Bitte Speicher freigeben und erneut versuchen."
+                : "Die Videodatei konnte nicht gespeichert werden: \(error.localizedDescription)"
+            handleError(id: id, message: message)
         }
     }
 
@@ -319,7 +323,16 @@ extension DownloadQueue: URLSessionDownloadDelegate {
         let nsError = error as NSError
         // Abbruch durch den Nutzer ist kein Fehler
         guard nsError.code != NSURLErrorCancelled else { return }
-        handleError(id: id, message: "Download fehlgeschlagen: \(error.localizedDescription)")
+        let message: String
+        switch nsError.code {
+        case NSURLErrorNotConnectedToInternet, NSURLErrorNetworkConnectionLost, NSURLErrorCannotConnectToHost:
+            message = "Verbindung zum PC unterbrochen. PC einschalten, WLAN prüfen und erneut versuchen."
+        case NSURLErrorTimedOut:
+            message = "Der Server hat zu lange nicht geantwortet. Server prüfen und erneut versuchen."
+        default:
+            message = "Download fehlgeschlagen: \(error.localizedDescription)"
+        }
+        handleError(id: id, message: message)
     }
 
     func urlSessionDidFinishEvents(forBackgroundURLSession session: URLSession) {

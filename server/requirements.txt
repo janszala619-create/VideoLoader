@@ -1,4 +1,4 @@
 fastapi
 uvicorn[standard]
-yt-dlp>=2025.1.0
+yt-dlp[default]>=2026.8.19
 curl_cffi

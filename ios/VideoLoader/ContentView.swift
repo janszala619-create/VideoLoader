@@ -5,15 +5,13 @@ struct ContentView: View {
     @Binding var pendingLink: String?
     @Environment(\.scenePhase) private var scenePhase
 
-    private static let defaultLocalServerURL = "http://100.80.105.62:9876"
-    private static let invalidVideoInputMessage = "Bitte gib einen YouTube-Link ins Linkfeld ein. Die Server-Adresse gehört in die Einstellungen."
+    private static let defaultLocalServerURL = ""
+    private static let invalidVideoInputMessage = "Bitte gib einen Video-Link ins Linkfeld ein. Die Server-Adresse gehört in die Einstellungen."
 
-    @AppStorage("serverURL_videoLoader") private var macServerURL = "http://100.80.105.62:9876"
-    @AppStorage("serverURL_vidSave") private var cloudServerURL = "http://158.101.168.11:8765"
+    @AppStorage("serverURL_videoLoader") private var macServerURL = ""
+    @AppStorage("serverURL_vidSave") private var cloudServerURL = ""
     @AppStorage("activeServer") private var activeServerRaw = ServerKind.videoLoader.rawValue
-    @AppStorage("didMigrateToLocalServer8765") private var didMigrateToLocalServer = false
-    @AppStorage("didMigrateToWindowsLocalServer8765") private var didMigrateToWindowsLocalServer = false
-    @AppStorage("didMigrateToLocalServer9876") private var didMigrateToLocalServer9876 = false
+    @AppStorage("didRemoveBundledServers") private var didRemoveBundledServers = false
     @AppStorage("preferredQualityID") private var preferredQualityID = "auto"
 
     @State private var clipboardHasLink = false
@@ -108,7 +106,7 @@ struct ContentView: View {
                     .accessibilityLabel("Einstellungen öffnen")
                 }
             }
-            .sheet(isPresented: $showSettings) {
+            .sheet(isPresented: $showSettings, onDismiss: { Task { await checkServer() } }) {
                 SettingsView(
                     macServerURL: $macServerURL,
                     cloudServerURL: $cloudServerURL,
@@ -131,27 +129,9 @@ struct ContentView: View {
                 }
             }
             .onAppear {
-                if !didMigrateToLocalServer {
-                    if macServerURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        macServerURL = Self.defaultLocalServerURL
-                    }
-                    activeServerRaw = ServerKind.videoLoader.rawValue
-                    didMigrateToLocalServer = true
-                }
-                if !didMigrateToWindowsLocalServer {
-                    let currentLocalURL = macServerURL.trimmingCharacters(in: .whitespacesAndNewlines)
-                    if currentLocalURL == "http://192.168.1.23:8000" ||
-                        currentLocalURL == "http://100.80.105.62:8765" ||
-                        currentLocalURL == cloudServerURL.trimmingCharacters(in: .whitespacesAndNewlines) {
-                        macServerURL = Self.defaultLocalServerURL
-                    }
-                    activeServerRaw = ServerKind.videoLoader.rawValue
-                    didMigrateToWindowsLocalServer = true
-                }
-                if !didMigrateToLocalServer9876 {
-                    migrateLocalServerURLTo9876IfNeeded()
-                    activeServerRaw = ServerKind.videoLoader.rawValue
-                    didMigrateToLocalServer9876 = true
+                if !didRemoveBundledServers {
+                    removeBundledServerAddresses()
+                    didRemoveBundledServers = true
                 }
                 if activeBaseURL.isEmpty { showSettings = true }
                 logActiveServer()
@@ -556,7 +536,7 @@ struct ContentView: View {
             guard validateVideoInput() else { return }
             let api = ServerAPI(kind: activeServer, baseURL: activeBaseURL)
             let url = try api.downloadURL(for: cleanedLink, quality: selectedQuality)
-            let fallback = try? api.downloadURL(for: cleanedLink, quality: nil)
+            let fallback: URL? = nil // Die gewählte Auflösung nicht automatisch überschreiten.
             let title = info?.title ?? "Video"
             queue.enqueue(
                 title: title,
@@ -613,25 +593,19 @@ struct ContentView: View {
         return qualities.first
     }
 
-    private func migrateLocalServerURLTo9876IfNeeded() {
-        let current = macServerURL.trimmingCharacters(in: .whitespacesAndNewlines)
-        var lowercased = current.lowercased()
-        while lowercased.hasSuffix("/") {
-            lowercased.removeLast()
-        }
-        let knownBadValues: Set<String> = [
-            "",
-            "http://158.101.168.11:8765",
-            "http://100.80.105.62:8765",
-            "/api/health",
+    private func removeBundledServerAddresses() {
+        let bundled: Set<String> = [
+            "http://100.80.105.62:9876", "http://100.80.105.62:8765",
+            "http://158.101.168.11:8765", "http://192.168.1.23:8000"
         ]
-        if knownBadValues.contains(current) ||
-            lowercased.contains("/api/health") ||
-            lowercased.contains("/api/info") ||
-            lowercased.contains("/api/download") ||
-            lowercased.contains("youtube.com") ||
-            lowercased.contains("youtu.be") {
-            macServerURL = Self.defaultLocalServerURL
+        func isBundled(_ value: String) -> Bool {
+            bundled.contains(value.trimmingCharacters(in: .whitespacesAndNewlines)
+                .trimmingCharacters(in: CharacterSet(charactersIn: "/")).lowercased())
+        }
+        if isBundled(macServerURL) { macServerURL = "" }
+        if isBundled(cloudServerURL) { cloudServerURL = "" }
+        if activeServer == .vidSave && cloudServerURL.isEmpty {
+            activeServerRaw = ServerKind.videoLoader.rawValue
         }
     }
 
@@ -674,8 +648,8 @@ private struct QualityPickerSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     private var recommended: QualityOption? {
-        info.qualities.first(where: { !$0.isAutomatic && !$0.isAudioOnly }) ??
-            info.qualities.first(where: { $0.isAutomatic }) ??
+        info.qualities.first(where: { $0.isAutomatic }) ??
+            info.qualities.first(where: { !$0.isAudioOnly }) ??
             info.qualities.first
     }
 
@@ -791,10 +765,10 @@ private struct QualityPickerSheet: View {
 private extension VideoInfo {
     var hasLimitedQualities: Bool {
         let realHeights = qualities.compactMap(\.height)
-        if realHeights.isEmpty {
-            return qualities.contains(where: { $0.isAutomatic }) || qualities.count <= 1
-        }
-        return realHeights.allSatisfy { $0 <= 360 }
+        // Einige Quellen, besonders HLS-Streams, liefern keine zuverlässigen
+        // Auflösungsmetadaten. In diesem Fall lädt „Automatisch“ trotzdem die
+        // beste verfügbare Qualität; die Warnung wäre daher irreführend.
+        return !realHeights.isEmpty && realHeights.allSatisfy { $0 <= 360 }
     }
 }
 
